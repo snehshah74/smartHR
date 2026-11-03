@@ -675,7 +675,7 @@ async function exportCsv(kind){const c=C();let rows,name;
   if(kind==='leave'){name='time-off.csv';rows=[['Employee','Type','From','To','Days','Status','Reason']].concat(c.leaves.map(l=>[byId(l.eid).name,l.type,l.from,l.to,l.days,l.status,l.reason]))}
   if(kind==='payroll'){name='payroll-register.csv';rows=[['Employee','Gross','Federal tax','State tax','Social Security','Medicare','401(k)','Benefits','Net']].concat(live().map(e=>{const p=pay(e);return [e.name,p.gross,p.fed,p.state,p.ss,p.med,p.k401,p.health,p.net].map((v,i)=>i?v.toFixed(2):v)}))}
   log('Exported '+name);
-  try{const d=await claude.use('downloads');if(!d)throw 0;await d.save({filename:name,data:csv(rows)});toast('Export ready')}catch(e){if(e&&e.code==='declined')return;toast('Downloads are not available in this view.')}}
+  try{const d=await claude.use('downloads');if(!d)throw 0;await d.save({filename:name,data:csv(rows)});toast('Export ready')}catch(e){if(e&&e.code==='declined')return;try{const u=URL.createObjectURL(new Blob([csv(rows)],{type:'text/csv'}));const l=document.createElement('a');l.href=u;l.download=name;document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);toast('Export ready')}catch(x){toast('Download failed.')}}}
 
 document.addEventListener('click',async ev=>{
   const el=ev.target.closest('[data-a]');
