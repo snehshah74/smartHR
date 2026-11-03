@@ -1,0 +1,814 @@
+<title>SmartHR</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: auth split screen; once signed in, a dark grouped nav rail (modules like Rippling's app menu), sticky top bar with global search, inbox and account menu, and a work area of full-page views with tabs. */
+:root{
+  --bg:#f3f5f3; --surface:#ffffff; --ink:#13201d; --muted:#5b6a66; --line:#dce3df;
+  --accent:#0e6a5a; --accent-ink:#ffffff; --accent-soft:#dff0ea; --sun:#e9a21b;
+  --good:#17803d; --good-soft:#dcf2e3; --warn:#a8650a; --warn-soft:#fbecc9; --bad:#b4352a; --bad-soft:#f9dedb;
+  --rail:#10231f; --rail-ink:#e4eeea; --rail-muted:#8ea39d; --rail-line:#223833;
+  --f-display:'Bricolage Grotesque',system-ui,sans-serif; --f-body:'Instrument Sans',system-ui,sans-serif; --f-mono:'JetBrains Mono',ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c1513; --surface:#132320; --ink:#e6efec; --muted:#93a8a2; --line:#233a35;
+  --accent:#3ccaa9; --accent-ink:#06211b; --accent-soft:#143a32; --sun:#f0b43c;
+  --good:#52c47d; --good-soft:#12361f; --warn:#e8b05a; --warn-soft:#3a2b0e; --bad:#f08073; --bad-soft:#3d1a16;
+  --rail:#0a1211; --rail-ink:#e4eeea; --rail-muted:#7f948e; --rail-line:#1a2d29; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0c1513; --surface:#132320; --ink:#e6efec; --muted:#93a8a2; --line:#233a35;
+  --accent:#3ccaa9; --accent-ink:#06211b; --accent-soft:#143a32; --sun:#f0b43c;
+  --good:#52c47d; --good-soft:#12361f; --warn:#e8b05a; --warn-soft:#3a2b0e; --bad:#f08073; --bad-soft:#3d1a16;
+  --rail:#0a1211; --rail-ink:#e4eeea; --rail-muted:#7f948e; --rail-line:#1a2d29; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--f-body);margin:0}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--accent)}
+.app{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100vh}
+.rail{background:var(--rail);color:var(--rail-ink);padding:18px 12px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh;overflow:auto}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px 10px;font:700 20px var(--f-display)}
+.brand i{width:26px;height:26px;border-radius:7px;background:var(--sun);display:grid;place-items:center;color:#10231f;font:700 14px var(--f-display);font-style:normal}
+.cmp{margin:0 4px 8px;padding:8px 10px;border-radius:8px;background:var(--rail-line);font-size:12px;color:var(--rail-muted)}
+.cmp b{display:block;color:var(--rail-ink);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.grp{font:500 10px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--rail-muted);padding:12px 10px 4px}
+.rail a.nv{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:8px;color:var(--rail-muted);text-decoration:none;font-weight:500}
+.rail a.nv:hover{color:var(--rail-ink);background:var(--rail-line)}
+.rail a.nv[aria-current=page]{background:var(--rail-line);color:var(--rail-ink);box-shadow:inset 3px 0 0 var(--sun)}
+.dot{background:var(--sun);color:#10231f;border-radius:99px;font:600 11px var(--f-mono);padding:1px 7px}
+.col{min-width:0;display:flex;flex-direction:column}
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;padding:10px max(24px,env(safe-area-inset-right,0px)) 10px max(24px,env(safe-area-inset-left,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:25;background:var(--surface)}
+.search{flex:1;max-width:520px;display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 12px;color:var(--muted);cursor:pointer;text-align:left}
+.search kbd{font:500 11px var(--f-mono);border:1px solid var(--line);border-radius:5px;padding:0 6px;background:var(--surface)}
+.tb-r{margin-left:auto;display:flex;gap:8px;align-items:center}
+.ibtn{position:relative;width:38px;height:38px;border-radius:9px;border:1px solid var(--line);background:var(--surface);cursor:pointer;display:grid;place-items:center;font-size:16px}
+.ibtn .dot{position:absolute;top:-6px;right:-6px}
+.menu-btn{display:none}
+.pop{position:relative}
+.panel{position:absolute;right:0;top:46px;width:340px;max-width:calc(100vw - 32px);background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.18);z-index:40;padding:8px}
+.panel[hidden]{display:none}
+.panel h3{font-size:14px;padding:8px 10px}
+.mi{display:block;width:100%;text-align:left;background:none;border:0;padding:9px 10px;border-radius:8px;cursor:pointer;text-decoration:none;color:var(--ink)}
+.mi:hover{background:var(--bg)}.mi small{display:block;color:var(--muted)}
+.main{padding-block:24px 56px;padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px));min-width:0}
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+.top h1{font-size:30px}
+.top p{margin:2px 0 0;color:var(--muted)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.sp{justify-content:space-between}
+.grid{display:grid;gap:16px}
+.kpis{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.two{grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;min-width:0}
+.card h2{font-size:17px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.kpi small,.lbl{display:block;color:var(--muted);font:500 11px var(--f-mono);text-transform:uppercase;letter-spacing:.07em}
+.kpi b{display:block;font:700 32px var(--f-display);margin-top:4px;font-variant-numeric:tabular-nums}
+.kpi span{color:var(--muted);font-size:12px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 14px;cursor:pointer;font-weight:500;text-decoration:none;display:inline-block;color:var(--ink)}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.sm{padding:4px 10px;font-size:13px}
+.btn.wide{width:100%;text-align:center;padding:10px}
+.btn.ok{background:var(--good-soft);border-color:var(--good);color:var(--good)}
+.btn.no{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.lnk{background:none;border:0;color:var(--accent);cursor:pointer;padding:0;font-weight:500;text-decoration:underline}
+:focus-visible{outline:2px solid var(--sun);outline-offset:2px}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}
+.pill.good{background:var(--good-soft);color:var(--good)}.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}.pill.mute{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%}
+th{text-align:left;font:500 11px var(--f-mono);text-transform:uppercase;letter-spacing:.07em;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+tbody tr.click{cursor:pointer}tbody tr.click:hover{background:var(--bg)}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;text-align:right}
+.av{width:30px;height:30px;border-radius:50%;display:inline-grid;place-items:center;font:600 12px var(--f-body);color:#10231f;flex:none}
+.av.lg{width:64px;height:64px;font-size:22px}
+.pp{display:flex;align-items:center;gap:10px}.pp small{display:block;color:var(--muted)}
+input,select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 11px;max-width:100%;width:100%}
+input[type=checkbox],input[type=radio]{width:auto}
+input[type=range]{padding:0}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field>span{font-size:12px;color:var(--muted);font-weight:500}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.err{color:var(--bad);font-size:13px;background:var(--bad-soft);border-radius:8px;padding:8px 10px}
+.hint{color:var(--muted);font-size:12px}
+.bar{height:8px;border-radius:9px;background:var(--bg);border:1px solid var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.heat{border-collapse:separate;border-spacing:3px}
+.heat td,.heat th{padding:0;border:0;text-align:center}
+.heat th{padding-bottom:4px;font-size:10px}
+.cell{width:26px;height:22px;border-radius:5px;display:block;background:var(--bg)}
+.cell.P{background:var(--good)}.cell.L{background:var(--sun)}.cell.A{background:var(--bad)}.cell.V{background:var(--accent-soft);border:1px solid var(--accent)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:10px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}
+.ann{padding:12px 0;border-bottom:1px solid var(--line)}.ann:last-child{border:0}
+.ann h3{font-size:15px}.ann small{color:var(--muted)}
+.scrim{position:fixed;inset:0;background:rgba(5,15,12,.5);display:flex;justify-content:flex-end;z-index:50}
+.scrim.mid{justify-content:center;align-items:flex-start;padding:8vh 16px 16px}
+.drawer{background:var(--surface);width:min(460px,100%);height:100%;overflow:auto;padding:22px max(20px,env(safe-area-inset-right,0px)) 40px 22px;border-left:1px solid var(--line)}
+.modal{background:var(--surface);width:min(520px,100%);max-height:84vh;overflow:auto;border-radius:14px;padding:22px;border:1px solid var(--line);height:fit-content}
+.drawer h2,.modal h2{font-size:22px;margin-bottom:4px}
+.dl{display:grid;grid-template-columns:130px 1fr;gap:8px 12px;margin:12px 0}.dl dt{color:var(--muted)}.dl dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:9px;z-index:80;max-width:90%}
+.chart text{fill:var(--muted);font:11px var(--f-mono)}
+.empty{color:var(--muted);padding:18px 0;text-align:center}
+.note{background:var(--accent-soft);border-radius:8px;padding:10px 12px;color:var(--ink);font-size:13px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:16px;overflow-x:auto}
+.tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:9px 14px;cursor:pointer;color:var(--muted);font-weight:500;white-space:nowrap}
+.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--sun)}
+.steps{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.steps span{padding:6px 12px;border-radius:99px;border:1px solid var(--line);color:var(--muted);font-weight:500}
+.steps span.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.steps span.done{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.inb{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}.inb:last-child{border:0}
+.inb small{color:var(--muted);display:block}
+.chk{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line)}.chk:last-child{border:0}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.cal .h{font:500 10px var(--f-mono);text-transform:uppercase;color:var(--muted);text-align:center}
+.cal .d{min-height:74px;border:1px solid var(--line);border-radius:7px;padding:4px;font-size:11px;overflow:hidden;background:var(--surface)}
+.cal .d.off{background:var(--bg);color:var(--muted)}.cal .d.t{border-color:var(--sun);box-shadow:inset 0 0 0 1px var(--sun)}
+.cal .d b{font:500 11px var(--f-mono)}
+.cal .c{display:block;background:var(--accent-soft);color:var(--accent);border-radius:4px;padding:0 4px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal .c.hol{background:var(--warn-soft);color:var(--warn)}
+.org,.org ul{list-style:none;margin:0;padding-left:26px;border-left:1px solid var(--line)}
+.org{border:0;padding:0}
+.org li{margin:8px 0}
+.node{display:inline-flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:7px 12px;cursor:pointer}
+.node small{display:block;color:var(--muted);font-size:12px}.node:hover{border-color:var(--accent)}
+/* auth */
+.auth{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);min-height:100vh}
+.auth-l{background:var(--rail);color:var(--rail-ink);padding:40px max(32px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;justify-content:space-between;gap:30px}
+.auth-l h1{font-size:40px;line-height:1.1;max-width:14ch}
+.auth-l ul{list-style:none;padding:0;margin:0;display:grid;gap:12px;color:var(--rail-muted)}
+.auth-l li b{color:var(--rail-ink);display:block}
+.auth-r{padding:40px max(24px,env(safe-area-inset-right,0px));display:flex;align-items:center;justify-content:center}
+.auth-c{width:min(440px,100%);display:grid;gap:14px}
+.auth-c h2{font-size:26px}
+.demo{border:1px dashed var(--line);border-radius:10px;padding:12px;display:grid;gap:8px}
+.meter{height:6px;border-radius:9px;background:var(--line);overflow:hidden}.meter i{display:block;height:100%;width:0;background:var(--bad);transition:width .2s}
+.pwrow{position:relative}.pwrow button{position:absolute;right:6px;top:6px;background:none;border:0;color:var(--accent);cursor:pointer;font-weight:500}
+@media (max-width:900px){
+  .app{grid-template-columns:1fr}
+  .rail{position:fixed;left:0;top:0;bottom:0;width:260px;z-index:60;transform:translateX(-100%);transition:transform .2s;padding-top:calc(18px + env(safe-area-inset-top,0px))}
+  .rail.open{transform:none}
+  .menu-btn{display:grid}
+  .search kbd{display:none}
+  .topbar,.main{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .top h1{font-size:25px}
+  .auth{grid-template-columns:1fr}.auth-l{padding-block:24px}.auth-l h1{font-size:30px}.auth-l ul{display:none}
+  .cal .d{min-height:54px}.cal .c{font-size:10px}
+  .dl{grid-template-columns:100px 1fr}
+}
+@media (prefers-reduced-motion:reduce){.rail{transition:none}}
+</style>
+
+<div id="root"></div>
+<div id="layer"></div>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const dkey=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const today=new Date(); today.setHours(0,0,0,0); const TK=dkey(today);
+function shift(n){const d=new Date(today);d.setDate(d.getDate()+n);return dkey(d)}
+const fmtD=s=>s?new Date(s+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'–';
+const fmtShort=s=>new Date(s+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'});
+const inr=n=>'$'+Math.round(n).toLocaleString('en-US');
+const usd2=n=>'$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+let seed=7; const rnd=()=>{seed=(seed*9301+49297)%233280;return seed/233280};
+const COLORS=['#9bd8c6','#f2cf8a','#b8c7f0','#f0b5a8','#c9e3a0','#d9b8ea','#a8dbe8'];
+const DEPTS=['Executive','Engineering','Product','Design','Sales','Operations','HR','Finance'];
+const STATES=['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC'];
+const NO_TAX=['TX','FL','WA','NV','TN','SD','WY','AK','NH'];
+const QUOTA={PTO:15,Sick:6,Personal:3};
+const DEMO_PW='Demo#2026';
+const DOCS=[{id:'hb',t:'Employee handbook',s:'Version 4.2 · updated Oct 2026'},{id:'coc',t:'Code of conduct',s:'Version 3.0'},{id:'pto',t:'PTO and holiday policy',s:'Effective Jan 1, 2026'},{id:'sec',t:'Information security policy',s:'Version 2.1 · new this quarter'}];
+const TASKS=[
+ {id:'w4',t:'Complete federal Form W-4',who:'employee'},{id:'i9',t:'Complete Form I-9, Section 1',who:'employee'},
+ {id:'dd',t:'Add direct deposit details',who:'employee'},{id:'hb',t:'Acknowledge the employee handbook',who:'employee'},
+ {id:'it',t:'Provision laptop and accounts',who:'admin'},{id:'i9v',t:'Verify I-9 documents within 3 business days',who:'admin'},{id:'bd',t:'Assign an onboarding buddy',who:'admin'}];
+function nth(y,m,dow,n){const d=new Date(y,m,1);let c=0;while(true){if(d.getDay()===dow&&++c===n)return d.getDate();d.setDate(d.getDate()+1)}}
+function lastMon(y,m){const d=new Date(y,m+1,0);while(d.getDay()!==1)d.setDate(d.getDate()-1);return d.getDate()}
+function holidays(y){const k=(m,d)=>y+'-'+pad(m+1)+'-'+pad(d);return {[k(0,1)]:'New Year\'s Day',[k(0,nth(y,0,1,3))]:'MLK Day',[k(1,nth(y,1,1,3))]:'Presidents\' Day',[k(4,lastMon(y,4))]:'Memorial Day',[k(5,19)]:'Juneteenth',[k(6,4)]:'Independence Day',[k(8,nth(y,8,1,1))]:'Labor Day',[k(10,11)]:'Veterans Day',[k(10,nth(y,10,4,4))]:'Thanksgiving',[k(11,25)]:'Christmas Day'}}
+
+/* ---------- Storage ---------- */
+const LS='smarthr.db.v3',SSK='smarthr.sess.v3';
+const st=(k,store)=>{try{return (store||localStorage).getItem(k)}catch(e){return null}};
+const stSet=(k,v,store)=>{try{(store||localStorage).setItem(k,v)}catch(e){}};
+const stDel=(k,store)=>{try{(store||localStorage).removeItem(k)}catch(e){}};
+let DB=null,SESS=null,AUTH={view:'login',err:'',pending:null,msg:''},route='home',booted=false;
+const save=()=>stSet(LS,JSON.stringify(DB));
+const C=()=>DB.companies[SESS.cid];
+const byId=id=>C().emps.find(e=>e.id===id);
+const me=()=>byId(SESS.eid);
+const role=()=>me().role;
+
+/* ---------- Crypto ---------- */
+const rand=n=>{try{const a=new Uint8Array(n);crypto.getRandomValues(a);return [...a].map(x=>x.toString(16).padStart(2,'0')).join('')}catch(e){return Math.random().toString(16).slice(2)+Date.now()}};
+async function hashPw(pw,salt){
+  try{const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']);
+    const b=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:new TextEncoder().encode(salt),iterations:60000},k,256);
+    return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+  catch(e){let h=0;for(const c of salt+pw)h=(h*31+c.charCodeAt(0))|0;return 'x'+h}}
+async function mkUser(email,pw,cid,eid){const salt=rand(8);return {email:email.toLowerCase(),salt,hash:await hashPw(pw,salt),cid,eid,fail:0,lock:0,active:true}}
+const pwScore=p=>{let s=0;if(p.length>=10)s++;if(/[a-z]/.test(p)&&/[A-Z]/.test(p))s++;if(/\d/.test(p))s++;if(/[^A-Za-z0-9]/.test(p))s++;return p.length<10?Math.min(s,1):s};
+const pwOk=p=>p.length>=10&&/[a-z]/.test(p)&&/[A-Z]/.test(p)&&/\d/.test(p);
+const PWMSG='Use at least 10 characters with upper case, lower case and a number.';
+const validEmail=e=>/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
+
+/* ---------- Company data builders ---------- */
+function newCompany(name,state,size,domain){return {id:'c'+Date.now().toString(36)+rand(2),name,state,size,domain,emps:[],leaves:[],reviews:{},anns:[],runs:[],onb:{},ack:{},audit:[],nextEmp:1,nextLeave:1,openEnroll:shift(12),sample:false,paySet:false}}
+const GOALS=[['Ship Q4 roadmap items',70],['Improve team documentation',40],['Mentor two new joiners',85],['Cut cycle time by 15%',55]];
+function addEmp(c,f){
+  const id=f.id||('e'+(c.nextEmp++));
+  let base=f.name.toLowerCase().replace(/[^a-z ]/g,'').trim().replace(/\s+/g,'.');let email=f.email||(base+'@'+c.domain),n=1;
+  while(c.emps.some(x=>x.email===email)){email=base+(++n)+'@'+c.domain}
+  const e={id,name:f.name,dept:f.dept,title:f.title,mgr:f.mgr||null,ctc:+f.ctc,join:f.join||TK,email,phone:f.phone||'(555) '+Math.floor(200+rnd()*700)+'-'+Math.floor(1000+rnd()*8999),
+    loc:f.loc||'New York, NY',status:f.status||'Active',color:COLORS[c.emps.length%COLORS.length],role:f.role||'employee',
+    used:f.used||{PTO:0,Sick:0,Personal:0},cls:+f.ctc<60000?'Non-exempt (hourly)':'Exempt (salaried)',
+    ben:f.ben||{medical:'PPO',dental:true,vision:false,k401:4,done:false},forms:{}};
+  c.emps.push(e);
+  c.reviews[id]={status:'Not started',rating:0,feedback:'',goals:GOALS.map(g=>({t:g[0],p:0}))};
+  c.ack[id]=[];
+  if(e.status==='Onboarding')c.onb[id]=TASKS.map(t=>({...t,done:false}));
+  return e;
+}
+function audit(c,who,what){c.audit.unshift({t:Date.now(),who,what});c.audit=c.audit.slice(0,200)}
+const SAMPLE=[
+['Alexandra Hayes','Executive','Chief Executive Officer',null,260000],
+['Jordan Mitchell','Engineering','Software Engineer',2,98000],['Taylor Brooks','Engineering','Engineering Manager',0,185000],
+['Marcus Reed','Engineering','Senior Engineer',2,150000],['Emily Chen','Engineering','QA Engineer',2,85000],['Devon Patel','Engineering','DevOps Engineer',2,125000],
+['Olivia Ramirez','Product','Product Manager',0,160000],['Ethan Walker','Product','Business Analyst',6,90000],
+['Sophia Nguyen','Design','Design Lead',0,145000],['Liam Foster','Design','UX Designer',8,95000],['Ava Thompson','Design','Visual Designer',8,78000],
+['Noah Bennett','Sales','VP of Sales',0,170000],['Isabella Cruz','Sales','Account Executive',11,82000],['Caleb Hughes','Sales','Account Executive',11,79000],['Grace Kim','Sales','Sales Development Rep',11,58000],
+['Henry Alvarez','Operations','Operations Manager',0,120000],['Chloe Davis','Operations','Logistics Coordinator',15,56000],['Samuel Ortiz','Operations','Procurement Analyst',15,72000],
+['Dana Whitfield','HR','HR Business Partner',0,115000],['Riley Jackson','HR','Talent Acquisition',18,88000],
+['Patricia Moore','Finance','Finance Controller',0,175000],['Nathan Brooks','Finance','Payroll Analyst',20,80000],['Maya Johnson','Engineering','Frontend Engineer',2,105000]];
+const LOCS=['New York, NY','Austin, TX','Chicago, IL','San Francisco, CA'];
+function populateSample(c,prefix,adminId){
+  seed=7;const ids=SAMPLE.map((_,i)=>prefix+i);
+  const hasKids=i=>SAMPLE.some(r=>r[3]===i);
+  SAMPLE.forEach((r,i)=>{
+    const j=new Date(today);j.setDate(j.getDate()-Math.floor(60+rnd()*2400));
+    const e=addEmp(c,{id:ids[i],name:r[0],dept:r[1],title:r[2],mgr:r[3]==null?null:ids[r[3]],ctc:r[4],join:dkey(j),loc:LOCS[i%4],
+      role:(!adminId&&i===18)?'admin':hasKids(i)?'manager':'employee',email:undefined,
+      used:{PTO:Math.floor(rnd()*7),Sick:Math.floor(rnd()*3),Personal:Math.floor(rnd()*2)},
+      ben:{medical:rnd()<.7?'PPO':'HDHP',dental:true,vision:rnd()<.5,k401:[3,4,5,6][i%4],done:i!==1&&i!==4}});
+    if(i===22){const j2=new Date(today);j2.setDate(j2.getDate()-30);e.join=dkey(j2)}
+    const stt=['Not started','Self review','Manager review','Completed'][i%4];
+    c.reviews[e.id]={status:stt,rating:stt==='Completed'?3+(i%3):0,feedback:stt==='Completed'?'Consistently reliable delivery and clear communication. Ready to take on larger scope.':'',goals:GOALS.map((g,q)=>({t:g[0],p:Math.min(100,Math.max(5,g[1]+((i*7+q*11)%30)-15))}))};
+    c.ack[e.id]=DOCS.map(d=>d.id).filter(d=>!(i===1&&d==='sec')&&!(i===4&&d!=='hb'));
+  });
+  if(adminId){const a=c.emps.find(x=>x.id===adminId);a.mgr=ids[0]}
+  c.sample=true;
+  const L=(i,t,f,to,d,r,s)=>({id:c.nextLeave++,eid:ids[i],type:t,from:shift(f),to:shift(to),days:d,reason:r,status:s});
+  c.leaves.push(L(3,'PTO',2,4,3,'Family trip','Pending'),L(4,'Sick',1,1,1,'Fever','Pending'),L(12,'Personal',6,6,1,'Moving apartments','Pending'),L(1,'PTO',-20,-18,3,'Family visit','Approved'),L(9,'PTO',10,14,5,'Wedding trip','Pending'),L(16,'Sick',-6,-5,2,'Recovery','Approved'),L(7,'Personal',-12,-12,1,'DMV appointment','Rejected'),L(10,'PTO',3,3,1,'Long weekend','Approved'));
+  c.anns.unshift({id:1,t:'Holiday calendar and Thanksgiving closure',b:'Offices close Nov 26 to 27 for Thanksgiving and Dec 24 to Jan 1 for the year-end break. Submit PTO before Nov 15 so approvals clear.',by:'Dana Whitfield',d:shift(-2),tag:'Policy'},
+    {id:2,t:'Mid-year review cycle opens this week',b:'Complete self reviews in the Performance tab. Managers have until the end of next week.',by:'Dana Whitfield',d:shift(-4),tag:'Performance'},
+    {id:3,t:'Benefits open enrollment ends soon',b:'Review medical, dental, vision and 401(k) elections in Benefits. Changes take effect Jan 1.',by:'Dana Whitfield',d:shift(-1),tag:'Benefits'});
+  for(let k=3;k>=1;k--){const end=-((k-1)*14)-3;c.runs.push({id:'r'+k,start:shift(end-13),end:shift(end),pay:shift(end+6),status:'Processed'})}
+  c.paySet=true;
+}
+function checkRun(c){ // ensure a current draft run
+  if(!c.runs.some(r=>r.status==='Draft'))c.runs.push({id:'rd'+Date.now(),start:shift(-2),end:shift(11),pay:shift(17),status:'Draft'})
+}
+async function seedDemo(){
+  const c=newCompany('Northwind Labs','NY','51-200','northwind.example');c.id='demo';
+  populateSample(c,'e',null);
+  const z=addEmp(c,{id:'e23',name:'Zoe Carter',dept:'Design',title:'Product Designer',mgr:'e8',ctc:92000,join:shift(7),status:'Onboarding',loc:'Austin, TX'});
+  c.onb[z.id][4].done=true;c.onb[z.id][6].done=true;
+  c.nextEmp=24;checkRun(c);c.audit=[];audit(c,'System','Demo workspace created');
+  DB.companies.demo=c;
+  for(const e of c.emps){if(e.status==='Onboarding')continue;DB.users.push(await mkUser(e.email,DEMO_PW,'demo',e.id))}
+  save();
+}
+
+/* ---------- Helpers ---------- */
+const avatar=(e,cl)=>`<span class="av ${cl||''}" style="background:${e.color}">${esc(e.name.split(' ').map(x=>x[0]).slice(0,2).join(''))}</span>`;
+const person=(e,sub)=>e?`<div class="pp">${avatar(e)}<div>${esc(e.name)}<small>${esc(sub==null?e.title:sub)}</small></div></div>`:'<span class="hint">Unknown</span>';
+const pill=(t,k)=>`<span class="pill ${k}">${esc(t)}</span>`;
+const stKind=s=>({Approved:'good',Pending:'warn',Rejected:'bad',Completed:'good','Not started':'mute','Self review':'warn','Manager review':'warn',Active:'good',Onboarding:'warn',Terminated:'bad',Processed:'good',Draft:'warn'}[s]||'mute');
+const live=()=>C().emps.filter(e=>e.status!=='Terminated');
+function team(){const c=C(),m=me();if(role()==='admin')return live();if(role()==='manager')return live().filter(e=>e.mgr===m.id||e.id===m.id);return [m]}
+function wdays(a,b){let n=0;for(let d=new Date(a+'T00:00:00'),e=new Date(b+'T00:00:00');d<=e;d.setDate(d.getDate()+1))if(d.getDay()%6)n++;return n}
+function balance(e,t){const bk=C().leaves.filter(l=>l.eid===e.id&&l.type===t&&l.status!=='Rejected'&&l.from>=shift(-5)).reduce((a,l)=>a+l.days,0);return QUOTA[t]-e.used[t]-bk}
+function canApprove(l){const e=byId(l.eid);return l.status==='Pending'&&e&&l.eid!==me().id&&(role()==='admin'||(role()==='manager'&&e.mgr===me().id))}
+function pay(e){const b=e.ben||{},st=(e.loc.split(', ')[1])||'NY',gross=e.ctc/26,k401=gross*(b.k401||0)/100,
+  health=(b.medical==='PPO'?85:b.medical==='HDHP'?40:0)+(b.dental?12:0)+(b.vision?5:0),taxable=gross-k401-health,
+  fr=e.ctc<60000?.08:e.ctc<100000?.12:e.ctc<150000?.16:.22,fed=taxable*fr,ss=Math.min(gross,184500/26)*.062,med=gross*.0145,
+  state=NO_TAX.includes(st)?0:taxable*.04,tax=fed+ss+med+state,ben=k401+health;return{gross,fed,ss,med,state,k401,health,tax,ben,net:gross-tax-ben}}
+function toast(m){const t=document.createElement('div');t.className='toast';t.setAttribute('role','status');t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2800)}
+function head(t,sub,actions){return `<div class="top"><div><h1>${t}</h1><p>${sub}</p></div><div class="row">${actions||''}</div></div>`}
+function log(what){const c=C();audit(c,me().name,what);save()}
+function commit(){save();render()}
+
+/* ---------- Charts ---------- */
+function hbars(items){const w=360,rh=26,h=items.length*rh+6;const m=Math.max(...items.map(i=>i[1]),1);
+  if(!items.length)return '<div class="empty">No data yet.</div>';
+  return `<svg class="chart" viewBox="0 0 ${w} ${h}" width="100%" role="img" aria-label="Bar chart">${items.map((it,i)=>{const y=i*rh+3,bw=Math.max(2,(w-150)*it[1]/m);
+  return `<text x="0" y="${y+14}">${esc(it[0])}</text><rect x="95" y="${y+3}" width="${bw}" height="14" rx="3" fill="var(--accent)"/><text x="${101+bw}" y="${y+14}" style="fill:var(--ink)">${it[1]}</text>`}).join('')}</svg>`}
+function vbars(items){const w=360,h=150,bw=w/items.length;const m=Math.max(...items.map(i=>i[1]),1);
+  return `<svg class="chart" viewBox="0 0 ${w} ${h}" width="100%" role="img" aria-label="Joiners by month"><line x1="0" y1="120" x2="${w}" y2="120" stroke="var(--line)"/>${items.map((it,i)=>{const bh=it[1]/m*90;
+  return `<rect x="${i*bw+6}" y="${120-bh}" width="${bw-12}" height="${bh}" rx="3" fill="${i===items.length-1?'var(--sun)':'var(--accent)'}"/><text x="${i*bw+bw/2}" y="138" text-anchor="middle">${it[0]}</text>${it[1]?`<text x="${i*bw+bw/2}" y="${114-bh}" text-anchor="middle" style="fill:var(--ink)">${it[1]}</text>`:''}`}).join('')}</svg>`}
+function line(vals,labels){const w=360,h=150,l=34,r=10,t=14,b=120;const lo=60,hi=100;const x=i=>l+i*(w-l-r)/(vals.length-1),y=v=>b-(Math.max(v,lo)-lo)/(hi-lo)*(b-t);
+  const pts=vals.map((v,i)=>x(i)+','+y(v)).join(' ');
+  return `<svg class="chart" viewBox="0 0 ${w} ${h}" width="100%" role="img" aria-label="Attendance rate trend">${[60,80,100].map(v=>`<line x1="${l}" x2="${w-r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="0" y="${y(v)+4}">${v}%</text>`).join('')}
+  <polygon points="${l},${b} ${pts} ${x(vals.length-1)},${b}" fill="var(--accent)" opacity=".13"/><polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>
+  <circle cx="${x(vals.length-1)}" cy="${y(vals[vals.length-1])}" r="5" fill="var(--sun)" stroke="var(--surface)" stroke-width="2"/>
+  ${labels.map((s,i)=>i%3===0||i===labels.length-1?`<text x="${x(i)}" y="142" text-anchor="${i===labels.length-1?'end':'middle'}">${s}</text>`:'').join('')}</svg>`}
+
+/* ---------- Auth screens ---------- */
+function authHtml(){
+  const v=AUTH.view,err=AUTH.err?`<div class="err" role="alert">${esc(AUTH.err)}</div>`:'',msg=AUTH.msg?`<div class="note">${esc(AUTH.msg)}</div>`:'';
+  const pw=(id,label,auto)=>`<label class="field"><span>${label}</span><div class="pwrow"><input id="${id}" type="password" autocomplete="${auto}" required><button type="button" data-a="showpw" data-id="${id}">Show</button></div></label>`;
+  const meter=`<div class="meter" aria-hidden="true"><i id="meter"></i></div><div class="hint" id="meterT">${PWMSG}</div>`;
+  let body='';
+  if(v==='login')body=`<h2>Log in to SmartHR</h2><p class="hint" style="margin:0">Welcome back. Enter your work email to continue.</p>${err}${msg}
+    <form id="f-login" class="grid" style="gap:12px" novalidate><label class="field"><span>Work email</span><input id="em" type="email" autocomplete="username" required value="${esc(AUTH.email||'')}"></label>${pw('pw','Password','current-password')}
+    <div class="row sp"><label class="row" style="gap:6px"><input type="checkbox" id="rem"> Keep me signed in</label><button type="button" class="lnk" data-a="auth" data-v="forgot">Forgot password?</button></div>
+    <button class="btn primary wide" type="submit">Log in</button></form>
+    <div class="row sp"><span>New to SmartHR? <button class="lnk" data-a="auth" data-v="signup">Create a company account</button></span></div>
+    <div>Have an invite? <button class="lnk" data-a="auth" data-v="join">Set up your account</button></div>
+    <div class="demo"><span class="lbl">Explore the demo company (Northwind Labs)</span>
+      <div class="row"><button class="btn sm" data-a="demo" data-em="dana.whitfield@northwind.example">HR Admin</button><button class="btn sm" data-a="demo" data-em="taylor.brooks@northwind.example">Manager</button><button class="btn sm" data-a="demo" data-em="jordan.mitchell@northwind.example">Employee</button></div>
+      <span class="hint">All demo passwords are ${DEMO_PW}. A pending invite exists for zoe.carter@northwind.example.</span></div>`;
+  if(v==='signup')body=`<h2>Create your company account</h2><p class="hint" style="margin:0">You become the first administrator. Takes about two minutes.</p>${err}
+    <form id="f-signup" class="grid" style="gap:12px" novalidate><div class="form"><label class="field"><span>Your full name</span><input id="sn" autocomplete="name" required></label><label class="field"><span>Work email</span><input id="em" type="email" autocomplete="email" required></label></div>
+    ${pw('pw','Password','new-password')}${meter}
+    <div class="form"><label class="field"><span>Company name</span><input id="cn" required></label><label class="field"><span>Employees</span><select id="cs"><option>1-10</option><option>11-50</option><option>51-200</option><option>201-500</option><option>500+</option></select></label>
+    <label class="field"><span>Headquarters state</span><select id="st">${STATES.map(s=>`<option ${s==='NY'?'selected':''}>${s}</option>`).join('')}</select></label></div>
+    <label class="row" style="gap:8px;align-items:flex-start"><input type="checkbox" id="tos" required><span>I agree to the Terms of Service and Privacy Policy.</span></label>
+    <button class="btn primary wide" type="submit">Continue</button></form><div>Already have an account? <button class="lnk" data-a="auth" data-v="login">Log in</button></div>`;
+  if(v==='verify')body=`<h2>Verify your email</h2><p class="hint" style="margin:0">We sent a 6-digit code to ${esc(AUTH.pending.email)}.</p>${err}
+    <div class="note">Prototype mode: no email is sent. Your code is <b class="num" style="font-family:var(--f-mono)">${AUTH.pending.code}</b></div>
+    <form id="f-verify" class="grid" style="gap:12px"><label class="field"><span>Verification code</span><input id="vc" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required></label><button class="btn primary wide" type="submit">Verify and create account</button></form>
+    <button class="lnk" data-a="auth" data-v="signup" style="justify-self:start">Use a different email</button>`;
+  if(v==='join')body=`<h2>Accept your invite</h2><p class="hint" style="margin:0">Use the work email your employer invited, then choose a password.</p>${err}
+    <form id="f-join" class="grid" style="gap:12px" novalidate><label class="field"><span>Work email</span><input id="em" type="email" autocomplete="username" required value="${esc(AUTH.email||'')}"></label>${pw('pw','Create password','new-password')}${meter}<button class="btn primary wide" type="submit">Create account</button></form>
+    <div class="hint">Demo invite: zoe.carter@northwind.example</div><div><button class="lnk" data-a="auth" data-v="login">Back to log in</button></div>`;
+  if(v==='forgot')body=`<h2>Reset your password</h2><p class="hint" style="margin:0">Enter your work email and we will send a reset code.</p>${err}
+    <form id="f-forgot" class="grid" style="gap:12px" novalidate><label class="field"><span>Work email</span><input id="em" type="email" autocomplete="username" required></label><button class="btn primary wide" type="submit">Send reset code</button></form><div><button class="lnk" data-a="auth" data-v="login">Back to log in</button></div>`;
+  if(v==='reset')body=`<h2>Choose a new password</h2>${err}
+    <div class="note">Prototype mode: no email is sent. If ${esc(AUTH.pending.email)} has an account, the code is <b style="font-family:var(--f-mono)">${AUTH.pending.code}</b></div>
+    <form id="f-reset" class="grid" style="gap:12px" novalidate><label class="field"><span>Reset code</span><input id="vc" inputmode="numeric" maxlength="6" required></label>${pw('pw','New password','new-password')}${meter}<button class="btn primary wide" type="submit">Update password</button></form>`;
+  return `<div class="auth"><section class="auth-l"><div class="brand"><i>S</i>SmartHR</div><div><h1>One place for every person at work.</h1></div>
+   <ul><li><b>People, onboarding and time off</b>Employee records, onboarding and PTO approvals in one system.</li><li><b>Payroll and benefits</b>Bi-weekly pay runs, tax withholding and open enrollment.</li><li><b>Reviews and reporting</b>Goals, ratings and live workforce analytics.</li></ul>
+   <small style="color:var(--rail-muted)">Prototype for review. Data is saved in this browser only.</small></section>
+   <section class="auth-r"><div class="auth-c">${body}<div class="hint" style="margin-top:6px"><button class="lnk" data-a="resetdemo">Reset all demo data</button></div></div></section></div>`;
+}
+function renderAuth(){booted=false;$('#root').innerHTML=authHtml();const f=$('#pw');if(f&&$('#meter'))f.addEventListener('input',meterUpd)}
+function meterUpd(){const s=pwScore($('#pw').value),m=$('#meter');m.style.width=(s*25)+'%';m.style.background=['var(--bad)','var(--bad)','var(--sun)','var(--good)','var(--good)'][s];$('#meterT').textContent=['Too weak','Too weak','Getting there','Strong','Strong'][s]+(s<3?'. '+PWMSG:'')}
+function authGo(v,msg){AUTH={view:v,err:'',msg:msg||'',pending:AUTH.pending,email:''};renderAuth()}
+function authErr(m){AUTH.err=m;const keep=$('#em')?$('#em').value:'';AUTH.email=keep;renderAuth()}
+
+async function login(email,pw,remember,silent){
+  email=(email||'').trim().toLowerCase();
+  if(!validEmail(email)||!pw)return authErr('Enter your work email and password.');
+  const u=DB.users.find(x=>x.email===email);
+  if(!u)return authErr('Email or password is incorrect.');
+  if(u.lock>Date.now())return authErr('Too many failed attempts. Try again in '+Math.ceil((u.lock-Date.now())/60000)+' minute(s).');
+  if(!u.active)return authErr('This account is deactivated. Contact your administrator.');
+  const h=await hashPw(pw,u.salt);
+  if(h!==u.hash){u.fail++;const c=DB.companies[u.cid];if(u.fail>=5){u.lock=Date.now()+15*60000;u.fail=0}
+    if(c)audit(c,email,'Failed login attempt');save();return authErr(u.lock>Date.now()?'Too many failed attempts. Account locked for 15 minutes.':'Email or password is incorrect.')}
+  const c=DB.companies[u.cid],e=c&&c.emps.find(x=>x.id===u.eid);
+  if(!e||e.status==='Terminated')return authErr('This account is no longer active.');
+  u.fail=0;SESS={email:u.email,cid:u.cid,eid:u.eid};
+  stSet(SSK,JSON.stringify(SESS),remember?localStorage:sessionStorage);if(!remember)stDel(SSK,localStorage);
+  audit(c,e.name,'Signed in');save();route=(location.hash||'').slice(1)||'home';AUTH={view:'login',err:'',msg:''};
+  render();if(!silent)toast('Welcome back, '+e.name.split(' ')[0]);
+}
+function logout(){if(SESS){try{log('Signed out')}catch(e){}}SESS=null;stDel(SSK,localStorage);stDel(SSK,sessionStorage);closeD();AUTH={view:'login',err:'',msg:'You have been signed out.'};renderAuth()}
+
+/* ---------- Shell ---------- */
+const NAV=[
+ ['Home',[['home','Home','all']]],
+ ['People',[['people','Directory','all'],['orgchart','Org chart','all'],['onboarding','Onboarding','admin']]],
+ ['Time',[['timeoff','Time off','all']]],
+ ['Pay & benefits',[['payroll','Payroll','all'],['benefits','Benefits','all']]],
+ ['Talent',[['performance','Performance','all']]],
+ ['Insights',[['reports','Reports','admin,manager']]],
+ ['Company',[['news','Announcements','all'],['documents','Documents','all'],['company-settings','Company settings','admin']]]
+];
+const allowed=r=>r==='all'||r.split(',').includes(role());
+function shellHtml(){return `<div class="app"><aside class="rail" id="rail"><div class="brand"><i>S</i>SmartHR</div><div class="cmp"><span>Workspace</span><b id="cname"></b></div><nav id="nav" aria-label="Main"></nav></aside>
+ <div class="col"><header class="topbar"><button class="ibtn menu-btn" data-a="navtoggle" aria-label="Open menu">☰</button>
+ <button class="search" data-a="palette" aria-label="Search"><span>Search people or jump to a page</span><kbd>Ctrl K</kbd></button>
+ <div class="tb-r"><div class="pop"><button class="ibtn" data-a="menu" data-id="inbox" aria-label="Inbox">🔔<span class="dot" id="bell"></span></button><div class="panel" id="p-inbox" hidden></div></div>
+ <div class="pop"><button class="ibtn" data-a="menu" data-id="user" id="ub" aria-label="Account menu"></button><div class="panel" id="p-user" hidden></div></div></div></header>
+ <main class="main" id="view"></main></div></div>`}
+function pendingTotal(){return inbox().length}
+function renderChrome(){
+  const c=C(),m=me();
+  $('#cname').textContent=c.name;
+  $('#nav').innerHTML=NAV.map(([g,items])=>{const its=items.filter(i=>allowed(i[2]));if(!its.length)return '';
+    return `<div class="grp">${g}</div>`+its.map(([k,l])=>{const n=k==='timeoff'?c.leaves.filter(canApprove).length:0;
+      return `<a class="nv" href="#${k}" ${routeBase()===k?'aria-current="page"':''}>${l}${n?`<span class="dot">${n}</span>`:''}</a>`}).join('')}).join('');
+  const n=pendingTotal();$('#bell').textContent=n;$('#bell').hidden=!n;
+  $('#ub').innerHTML=avatar(m);
+  $('#p-user').innerHTML=`<div style="padding:10px"><b>${esc(m.name)}</b><small style="display:block;color:var(--muted)">${esc(m.email)}</small><span class="pill mute" style="margin-top:6px">${{admin:'HR Admin',manager:'Manager',employee:'Employee'}[m.role]}</span></div>
+   <a class="mi" href="#person-${m.id}">My profile</a><a class="mi" href="#account">Account and security</a><button class="mi" data-a="logout">Log out</button>`;
+  const items=inbox();
+  $('#p-inbox').innerHTML=`<h3>Inbox</h3>${items.length?items.slice(0,6).map(i=>`<a class="mi" href="#${i.to}">${esc(i.t)}<small>${esc(i.sub)}</small></a>`).join(''):'<div class="empty">You are all caught up.</div>'}${items.length>6?`<a class="mi" href="#home">See all ${items.length} on Home</a>`:''}`;
+}
+const routeBase=()=>route.startsWith('person-')?'people':route==='payroll-run'?'payroll':route;
+function inbox(){
+  const c=C(),m=me(),r=role(),it=[];
+  c.leaves.filter(canApprove).forEach(l=>{const e=byId(l.eid);it.push({t:e.name+' requested '+l.days+' day'+(l.days>1?'s':'')+' of '+l.type,sub:fmtD(l.from)+(l.to!==l.from?' to '+fmtD(l.to):''),to:'timeoff',cta:'Review'})});
+  (c.onb[m.id]||[]).filter(t=>t.who==='employee'&&!t.done).forEach(t=>it.push({t:t.t,sub:'Onboarding task',to:'person-'+m.id,cta:'Complete',task:t.id}));
+  if(m.status!=='Onboarding'){
+    if(!m.ben.done)it.push({t:'Finish your benefits enrollment',sub:'Open enrollment ends '+fmtD(c.openEnroll),to:'benefits',cta:'Enroll'});
+    const rv=c.reviews[m.id];if(rv&&['Not started','Self review'].includes(rv.status)&&c.sample)it.push({t:'Complete your self review',sub:'Mid-year review cycle',to:'performance',cta:'Start'});
+    const un=DOCS.filter(d=>!(c.ack[m.id]||[]).includes(d.id));if(un.length)it.push({t:'Acknowledge '+un.length+' company document'+(un.length>1?'s':''),sub:un.map(d=>d.t).join(', '),to:'documents',cta:'Open'});
+  }
+  if(r==='manager'||r==='admin'){const n=team().filter(e=>e.id!==m.id&&c.reviews[e.id].status==='Manager review').length;if(n)it.push({t:n+' review'+(n>1?'s':'')+' waiting for your assessment',sub:'Performance',to:'performance',cta:'Open'})}
+  if(r==='admin'){const d=c.runs.find(x=>x.status==='Draft');if(d&&c.emps.length>1)it.push({t:'Payroll for '+fmtShort(d.start)+' to '+fmtShort(d.end)+' is ready to run',sub:'Pay date '+fmtD(d.pay),to:'payroll-run',cta:'Run payroll'});
+    const o=c.emps.filter(e=>e.status==='Onboarding').length;if(o)it.push({t:o+' new hire'+(o>1?'s':'')+' in onboarding',sub:'Check outstanding tasks',to:'onboarding',cta:'Open'})}
+  return it;
+}
+function render(){
+  if(!SESS||!DB.companies[SESS.cid]||!byId(SESS.eid)){SESS=null;return renderAuth()}
+  if(!booted||!$('#view')){$('#root').innerHTML=shellHtml();booted=true}
+  const base=route.split('-')[0];
+  if(!VIEWS[route]&&!route.startsWith('person-')){route='home'}
+  const gate={onboarding:'admin','company-settings':'admin',reports:'admin,manager'}[route];
+  if(gate&&!allowed(gate)){route='home'}
+  if(route==='payroll-run'&&role()!=='admin')route='payroll';
+  renderChrome();
+  $('#view').innerHTML=route.startsWith('person-')?person_page(route.slice(7)):VIEWS[route]();
+  const after=AFTER[route];if(after)after();
+  $('#rail').classList.remove('open');
+  document.title='SmartHR';
+}
+const AFTER={};
+
+/* ---------- Views ---------- */
+const VIEWS={};
+VIEWS.home=function(){
+  const c=C(),m=me(),r=role(),items=inbox(),sc=team();
+  const out=c.leaves.filter(l=>l.status==='Approved'&&l.from<=shift(6)&&l.to>=TK);
+  let h=head('Good '+(new Date().getHours()<12?'morning':new Date().getHours()<18?'afternoon':'evening')+', '+esc(m.name.split(' ')[0]),c.name+' · '+today.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}),'');
+  if(r==='admin'&&c.emps.length<=1&&!c.sample){
+    const steps=[['Import a sample team of 23 people to explore every module','import','Import sample team',c.sample],['Add your first employee and send an invite','addemp','Add employee',c.emps.length>1],['Review your bi-weekly pay schedule','paysched','Confirm schedule',c.paySet],['Post a welcome announcement','news','Write one',c.anns.length>0]];
+    h+=`<div class="card" style="margin-bottom:16px"><h2>Set up ${esc(c.name)}</h2>${steps.map(s=>`<div class="chk"><span>${s[3]?'✅':'⬜'}</span><div style="flex:1">${s[0]}</div>${s[3]?'':`<button class="btn sm primary" data-a="${s[1]==='news'?'go':'setup'}" data-to="news" data-id="${s[1]}">${s[2]}</button>`}</div>`).join('')}</div>`;
+  }
+  if(r!=='employee'&&c.emps.length>1)h+=`<div class="grid kpis" style="margin-bottom:16px"><div class="card kpi"><small>Headcount</small><b>${sc.length}</b><span>${r==='admin'?'active employees':'in your team'}</span></div><div class="card kpi"><small>Out this week</small><b>${out.filter(l=>sc.some(e=>e.id===l.eid)).length}</b><span>approved time off</span></div><div class="card kpi"><small>Inbox</small><b>${items.length}</b><span>items need you</span></div></div>`;
+  h+=`<div class="grid two"><div class="card"><h2>Your inbox</h2>${items.length?items.map(i=>`<div class="inb"><div>${esc(i.t)}<small>${esc(i.sub)}</small></div><a class="btn sm ${i.cta==='Review'||i.cta==='Run payroll'?'primary':''}" href="#${i.to}">${esc(i.cta)}</a></div>`).join(''):'<div class="empty">You are all caught up.</div>'}</div>
+  <div class="card"><h2>Quick links</h2><div class="row"><a class="btn sm" href="#timeoff">Request time off</a><a class="btn sm" href="#payroll">${r==='admin'?'Payroll':'Payslips'}</a><a class="btn sm" href="#person-${m.id}">My profile</a></div></div>
+  <div class="card"><h2>Who's out this week</h2>${out.length?out.slice(0,6).map(l=>{const e=byId(l.eid);return `<div class="inb">${person(e,l.type+' · '+fmtShort(l.from)+(l.to!==l.from?' to '+fmtShort(l.to):''))}</div>`}).join(''):'<div class="empty">Nobody is out.</div>'}</div>
+  <div class="card"><h2>Announcements <a href="#news" class="btn sm">All</a></h2>${c.anns.length?c.anns.slice(0,3).map(a=>`<div class="ann"><small>${esc(a.tag)} · ${fmtD(a.d)}</small><h3>${esc(a.t)}</h3></div>`).join(''):'<div class="empty">No announcements yet.</div>'}</div>
+  ${r!=='employee'&&c.emps.length>1?`<div class="card"><h2>Headcount by department</h2>${hbars(DEPTS.map(d=>[d,sc.filter(e=>e.dept===d).length]).filter(x=>x[1]))}</div>`:''}</div>`;
+  return h;
+};
+let dirQ='',dirD='',dirS='';
+VIEWS.people=function(){
+  const c=C();
+  return head('Directory',live().length+' people at '+esc(c.name),role()==='admin'?`<button class="btn primary" data-a="addemp">Add employee</button>`:'')+
+  `<div class="card"><div class="row" style="margin-bottom:12px"><input id="q" type="search" placeholder="Search name, title or email" value="${esc(dirQ)}" style="flex:1;min-width:200px;width:auto"><select id="df" aria-label="Department" style="width:auto"><option value="">All departments</option>${DEPTS.map(d=>`<option ${d===dirD?'selected':''}>${d}</option>`).join('')}</select>${role()==='admin'?`<select id="sf" aria-label="Status" style="width:auto"><option value="">Active and onboarding</option><option ${dirS==='Terminated'?'selected':''} value="Terminated">Terminated</option></select>`:''}</div>
+  <div class="tw"><table><thead><tr><th>Employee</th><th>Department</th><th>Location</th><th>Start date</th><th>Status</th></tr></thead><tbody id="eb"></tbody></table></div></div>`;
+};
+AFTER.people=fillEmps;
+function fillEmps(){
+  const q=dirQ.toLowerCase(),list=C().emps.filter(e=>(dirS?e.status===dirS:e.status!=='Terminated')&&(!dirD||e.dept===dirD)&&(e.name+e.title+e.email).toLowerCase().includes(q));
+  $('#eb').innerHTML=list.length?list.map(e=>`<tr class="click" data-a="go" data-to="person-${e.id}"><td>${person(e)}</td><td>${e.dept}</td><td>${esc(e.loc)}</td><td>${fmtD(e.join)}</td><td>${pill(e.status,stKind(e.status))}</td></tr>`).join(''):'<tr><td colspan="5" class="empty">No one matches those filters.</td></tr>';
+}
+let ptab='Overview';
+function person_page(id){
+  const c=C(),e=byId(id);if(!e)return head('Not found','That person is not in this workspace.','<a class="btn" href="#people">Back to directory</a>');
+  const self=e.id===me().id,adm=role()==='admin',mgrOf=role()==='manager'&&e.mgr===me().id,seePay=adm||self,mg=byId(e.mgr);
+  const tabs=['Overview','Job and pay','Time off','Documents'].filter(t=>t!=='Job and pay'||seePay||mgrOf).concat(c.sample||self||adm?['Performance']:[]);
+  if(!tabs.includes(ptab))ptab='Overview';
+  let body='';
+  if(ptab==='Overview')body=`<div class="grid two"><div class="card"><h2>Contact</h2><dl class="dl"><dt>Work email</dt><dd>${esc(e.email)}</dd><dt>Phone</dt><dd>${esc(e.phone)}</dd><dt>Location</dt><dd>${esc(e.loc)}</dd><dt>Manager</dt><dd>${mg?`<a href="#person-${mg.id}">${esc(mg.name)}</a>`:'None'}</dd></dl></div>
+   <div class="card"><h2>Employment</h2><dl class="dl"><dt>Department</dt><dd>${e.dept}</dd><dt>Start date</dt><dd>${fmtD(e.join)}</dd><dt>Status</dt><dd>${pill(e.status,stKind(e.status))}</dd><dt>Direct reports</dt><dd>${c.emps.filter(x=>x.mgr===e.id&&x.status!=='Terminated').map(x=>`<a href="#person-${x.id}">${esc(x.name)}</a>`).join(', ')||'None'}</dd></dl></div>
+   ${self&&c.onb[e.id]?onbCard(e):''}</div>`;
+  if(ptab==='Job and pay'){const p=pay(e);body=`<div class="grid two"><div class="card"><h2>Compensation</h2><dl class="dl"><dt>Annual salary</dt><dd>${inr(e.ctc)}</dd><dt>Per paycheck (gross)</dt><dd>${usd2(p.gross)}</dd><dt>Net per paycheck</dt><dd>${usd2(p.net)}</dd><dt>Pay schedule</dt><dd>Bi-weekly</dd><dt>FLSA status</dt><dd>${e.cls}</dd></dl>${seePay?'':'<div class="hint">Visible to administrators and the employee.</div>'}</div>
+   <div class="card"><h2>Tax and payment setup</h2><dl class="dl"><dt>Form W-4</dt><dd>${e.forms.w4?pill('On file · '+esc(e.forms.w4.filing),'good'):pill('Missing','warn')}</dd><dt>Form I-9</dt><dd>${e.forms.i9?pill('On file','good'):pill('Missing','warn')}</dd><dt>Direct deposit</dt><dd>${e.forms.dd?pill('Account ending '+esc(e.forms.dd.last4),'good'):pill('Not set','warn')}</dd></dl></div></div>`}
+  if(ptab==='Time off')body=`<div class="card"><h2>Balances</h2>${Object.keys(QUOTA).map(t=>`<div style="margin-bottom:12px"><div class="row sp"><span>${t}</span><span class="num">${balance(e,t)} of ${QUOTA[t]} days left</span></div><div class="bar"><i style="width:${Math.max(0,balance(e,t))/QUOTA[t]*100}%"></i></div></div>`).join('')}</div>`;
+  if(ptab==='Documents')body=`<div class="card"><h2>Acknowledged documents</h2>${DOCS.map(d=>`<div class="inb"><div>${d.t}<small>${d.s}</small></div>${(c.ack[e.id]||[]).includes(d.id)?pill('Acknowledged','good'):pill('Pending','warn')}</div>`).join('')}</div>`;
+  if(ptab==='Performance'){const r=c.reviews[e.id];body=`<div class="card"><h2>Mid-year review ${pill(r.status,stKind(r.status))}</h2>${r.goals.map(g=>`<div style="margin-bottom:10px"><div class="row sp"><span>${esc(g.t)}</span><span class="num">${g.p}%</span></div><div class="bar"><i style="width:${g.p}%"></i></div></div>`).join('')}<button class="btn" data-a="review" data-id="${e.id}">Open review</button></div>`}
+  return `<div class="row" style="margin-bottom:14px"><a href="#people" class="lnk">← Directory</a></div>
+  <div class="card" style="margin-bottom:16px"><div class="row sp"><div class="pp" style="gap:16px">${avatar(e,'lg')}<div><h1 style="font-size:26px">${esc(e.name)}</h1>${esc(e.title)} · ${e.dept}<div style="margin-top:4px">${pill(e.status,stKind(e.status))} ${pill({admin:'HR Admin',manager:'Manager',employee:'Employee'}[e.role],'mute')}</div></div></div>
+  <div class="row">${adm?`<button class="btn" data-a="editemp" data-id="${e.id}">Edit</button>${e.status!=='Terminated'&&!self?`<button class="btn no" data-a="offboard" data-id="${e.id}">Offboard</button>`:''}`:''}</div></div></div>
+  <div class="tabs" role="tablist">${tabs.map(t=>`<button role="tab" aria-selected="${t===ptab}" data-a="ptab" data-id="${t}">${t}</button>`).join('')}</div>${body}`;
+}
+function onbCard(e){const c=C(),ts=c.onb[e.id];const done=ts.filter(t=>t.done).length;
+  return `<div class="card" style="grid-column:1/-1"><h2>Onboarding checklist <span class="hint">${done} of ${ts.length} done</span></h2><div class="bar" style="margin-bottom:8px"><i style="width:${done/ts.length*100}%"></i></div>${ts.map(t=>`<div class="chk"><span>${t.done?'✅':'⬜'}</span><div style="flex:1">${t.t}<small class="hint" style="display:block">${t.who==='admin'?'Assigned to HR':'Assigned to the employee'}</small></div>${!t.done&&((t.who==='employee'&&e.id===me().id)||(t.who==='admin'&&role()==='admin'))?`<button class="btn sm primary" data-a="task" data-id="${e.id}" data-t="${t.id}">${t.who==='admin'?'Mark done':'Complete'}</button>`:''}</div>`).join('')}</div>`}
+
+VIEWS.orgchart=function(){
+  const c=C(),ls=live(),ids=new Set(ls.map(e=>e.id)),roots=ls.filter(e=>!e.mgr||!ids.has(e.mgr));
+  const node=(e,d)=>{const kids=ls.filter(x=>x.mgr===e.id);return `<li><div class="node" data-a="go" data-to="person-${e.id}">${avatar(e)}<div>${esc(e.name)}<small>${esc(e.title)}${kids.length?' · '+kids.length+' report'+(kids.length>1?'s':''):''}</small></div></div>${kids.length&&d<8?`<ul>${kids.map(k=>node(k,d+1)).join('')}</ul>`:''}</li>`};
+  return head('Org chart','Reporting lines across '+esc(c.name),'')+`<div class="card"><ul class="org">${roots.map(r=>node(r,0)).join('')||'<div class="empty">No employees yet.</div>'}</ul></div>`;
+};
+VIEWS.onboarding=function(){
+  const c=C(),list=c.emps.filter(e=>c.onb[e.id]);
+  return head('Onboarding','New hire checklists and invites',`<button class="btn primary" data-a="addemp">Add employee</button>`)+
+  `<div class="card"><div class="tw"><table><thead><tr><th>New hire</th><th>Start date</th><th>Progress</th><th>Login</th><th></th></tr></thead><tbody>${list.length?list.map(e=>{const ts=c.onb[e.id],d=ts.filter(t=>t.done).length,u=DB.users.find(x=>x.eid===e.id&&x.cid===c.id);
+    return `<tr><td>${person(e)}</td><td>${fmtD(e.join)}</td><td style="min-width:150px"><div class="bar"><i style="width:${d/ts.length*100}%"></i></div><small class="hint">${d} of ${ts.length} tasks</small></td><td>${u?pill('Account created','good'):pill('Invite pending','warn')}</td><td style="text-align:right"><a class="btn sm" href="#person-${e.id}">Open</a></td></tr>`}).join(''):'<tr><td colspan="5" class="empty">No one is onboarding. Add an employee to start a checklist.</td></tr>'}</tbody></table></div></div>`;
+};
+let calM={y:today.getFullYear(),m:today.getMonth()};
+VIEWS.timeoff=function(){
+  const c=C(),m=me();
+  const list=c.leaves.filter(l=>role()==='admin'||l.eid===m.id||(role()==='manager'&&byId(l.eid)&&byId(l.eid).mgr===m.id)).sort((a,b)=>b.id-a.id);
+  const hol=holidays(calM.y),first=new Date(calM.y,calM.m,1),dim=new Date(calM.y,calM.m+1,0).getDate();
+  const vis=role()==='admin'?live():live().filter(e=>e.dept===m.dept);
+  let cells='';for(let i=0;i<first.getDay();i++)cells+='<div></div>';
+  for(let d=1;d<=dim;d++){const k=calM.y+'-'+pad(calM.m+1)+'-'+pad(d),dow=new Date(calM.y,calM.m,d).getDay();
+    const outs=c.leaves.filter(l=>l.status!=='Rejected'&&l.from<=k&&l.to>=k&&vis.some(e=>e.id===l.eid));
+    cells+=`<div class="d ${dow%6===0?'off':''} ${k===TK?'t':''}"><b>${d}</b>${hol[k]?`<span class="c hol">${esc(hol[k])}</span>`:''}${outs.slice(0,2).map(l=>`<span class="c" title="${esc(byId(l.eid).name)} · ${l.type}">${esc(byId(l.eid).name.split(' ')[0])}</span>`).join('')}${outs.length>2?`<span class="hint">+${outs.length-2} more</span>`:''}</div>`}
+  return head('Time off','Request PTO, see who is out and track approvals','')+
+  `<div class="grid two"><div class="card"><h2>New request</h2><div class="note" style="margin-bottom:12px">Sick leave follows your state's paid sick leave rules. For FMLA or extended leave, contact HR.</div><form id="lf" class="form">
+    <label class="field"><span>Type</span><select id="lt">${Object.keys(QUOTA).map(t=>`<option>${t}</option>`).join('')}</select></label>
+    <label class="field"><span>From</span><input type="date" id="lfrom" value="${shift(3)}" required></label><label class="field"><span>To</span><input type="date" id="lto" value="${shift(3)}" required></label>
+    <label class="field" style="grid-column:1/-1"><span>Reason</span><textarea id="lr" rows="2" placeholder="Optional note for your approver"></textarea></label>
+    <div style="grid-column:1/-1" class="row"><button class="btn primary" type="submit">Submit request</button><span id="ld" class="hint"></span></div></form></div>
+   <div class="card"><h2>My balance</h2>${Object.keys(QUOTA).map(t=>`<div style="margin-bottom:12px"><div class="row sp"><span>${t}</span><span class="num">${balance(m,t)} of ${QUOTA[t]} days left</span></div><div class="bar"><i style="width:${Math.max(0,balance(m,t))/QUOTA[t]*100}%"></i></div></div>`).join('')}</div></div>
+  <div class="card" style="margin-top:16px"><h2>${new Date(calM.y,calM.m,1).toLocaleDateString('en-US',{month:'long',year:'numeric'})}<span class="row"><button class="btn sm" data-a="calnav" data-id="-1" aria-label="Previous month">←</button><button class="btn sm" data-a="calnav" data-id="0">Today</button><button class="btn sm" data-a="calnav" data-id="1" aria-label="Next month">→</button></span></h2>
+   <div class="cal">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(x=>`<div class="h">${x}</div>`).join('')}${cells}</div><div class="legend"><span>Showing ${role()==='admin'?'everyone':'your department'} · US federal holidays in amber</span></div></div>
+  <div class="card" style="margin-top:16px"><h2>${role()==='employee'?'My requests':'Requests'}</h2><div class="tw"><table><thead><tr><th>Employee</th><th>Type</th><th>Dates</th><th style="text-align:right">Days</th><th>Status</th><th></th></tr></thead><tbody>${list.length?list.map(l=>{const e=byId(l.eid);return `<tr><td>${person(e,l.reason||'No reason given')}</td><td>${l.type}</td><td style="white-space:nowrap">${fmtD(l.from)}${l.to!==l.from?' to '+fmtD(l.to):''}</td><td class="num">${l.days}</td><td>${pill(l.status,stKind(l.status))}</td><td style="white-space:nowrap;text-align:right">${canApprove(l)?`<button class="btn sm ok" data-a="approve" data-id="${l.id}">Approve</button> <button class="btn sm no" data-a="reject" data-id="${l.id}">Reject</button>`:(l.status==='Pending'&&l.eid===m.id?`<button class="btn sm" data-a="cancel" data-id="${l.id}">Withdraw</button>`:'')}</td></tr>`}).join(''):'<tr><td colspan="6" class="empty">No requests yet.</td></tr>'}</tbody></table></div></div>`;
+};
+AFTER.timeoff=function(){
+  const upd=()=>{const a=$('#lfrom').value,b=$('#lto').value;$('#ld').textContent=a&&b&&b>=a?wdays(a,b)+' working day(s)':'Check the dates'};['lfrom','lto'].forEach(i=>$('#'+i).addEventListener('input',upd));upd()};
+
+const slip=(rows,tl,tv)=>`<table><tbody>${rows.map(r=>`<tr><td>${r[0]}</td><td class="num">${usd2(r[1])}</td></tr>`).join('')}<tr><td><b>${tl}</b></td><td class="num"><b>${usd2(tv)}</b></td></tr></tbody></table>`;
+const period=r=>fmtShort(r.start)+' to '+fmtShort(r.end)+', '+r.end.slice(0,4);
+VIEWS.payroll=function(){
+  const c=C(),m=me();
+  if(role()!=='admin'){
+    const runs=c.runs.filter(r=>r.status==='Processed'&&r.end>=m.join).slice().reverse();
+    return head('Payroll','Your payslips and tax documents','')+`<div class="grid two"><div class="card"><h2>Payslips</h2>${runs.length?runs.map(r=>{const p=pay(m);return `<div class="inb"><div>${period(r)}<small>Paid ${fmtD(r.pay)}</small></div><div class="row"><b class="num">${usd2(p.net)}</b><button class="btn sm" data-a="payslip" data-id="${r.id}">View</button></div></div>`}).join(''):'<div class="empty">No payslips yet. Your first appears after your first pay date.</div>'}</div>
+    <div class="card"><h2>Tax documents</h2><div class="inb"><div>Form W-2 for ${today.getFullYear()-1}<small>Available each January</small></div>${pill('Not yet issued','mute')}</div><div class="inb"><div>Form W-4<small>Federal withholding</small></div>${m.forms.w4?pill('On file','good'):pill('Missing','warn')}</div><div class="inb"><div>Direct deposit<small>Where your pay is sent</small></div>${m.forms.dd?pill('Ends '+esc(m.forms.dd.last4),'good'):pill('Not set','warn')}</div></div></div>`;
+  }
+  const d=c.runs.find(r=>r.status==='Draft'),act=live().filter(e=>e.status==='Active'||e.status==='Onboarding'&&e.join<=d.end);
+  const hist=c.runs.filter(r=>r.status==='Processed').slice().reverse();
+  const tot=act.reduce((a,e)=>a+pay(e).net,0),gross=act.reduce((a,e)=>a+pay(e).gross,0);
+  return head('Payroll','Bi-weekly schedule · next pay date '+fmtD(d.pay),act.length?`<a class="btn primary" href="#payroll-run">Run payroll</a>`:'')+
+  `<div class="grid kpis" style="margin-bottom:16px"><div class="card kpi"><small>Next gross</small><b>${inr(gross)}</b><span>${act.length} employees</span></div><div class="card kpi"><small>Next net</small><b>${inr(tot)}</b><span>after taxes and benefits</span></div><div class="card kpi"><small>Pay period</small><b style="font-size:20px;padding-top:10px">${fmtShort(d.start)} to ${fmtShort(d.end)}</b><span>Pay date ${fmtD(d.pay)}</span></div></div>
+  <div class="card"><h2>Pay run history</h2><div class="tw"><table><thead><tr><th>Period</th><th>Pay date</th><th style="text-align:right">Employees</th><th style="text-align:right">Gross</th><th style="text-align:right">Net</th><th>Status</th></tr></thead><tbody>${hist.length?hist.map(r=>{const a=live().filter(e=>e.join<=r.end),g=a.reduce((x,e)=>x+pay(e).gross,0),n=a.reduce((x,e)=>x+pay(e).net,0);return `<tr><td>${period(r)}</td><td>${fmtD(r.pay)}</td><td class="num">${r.count||a.length}</td><td class="num">${usd2(r.gross||g)}</td><td class="num">${usd2(r.net||n)}</td><td>${pill('Processed','good')}</td></tr>`}).join(''):'<tr><td colspan="6" class="empty">No pay runs yet.</td></tr>'}</tbody></table></div></div>`;
+};
+let runStep=1,runOk=false;
+VIEWS['payroll-run']=function(){
+  const c=C(),d=c.runs.find(r=>r.status==='Draft');
+  const act=live().filter(e=>e.status==='Active'||e.status==='Onboarding'&&e.join<=d.end),rows=act.map(e=>({e,p:pay(e)}));
+  const T=k=>rows.reduce((a,r)=>a+r.p[k],0),warn=rows.filter(r=>!r.e.forms.dd&&c.sample?false:!r.e.forms.dd);
+  const stp=n=>`<span class="${runStep===n?'on':runStep>n?'done':''}">${n}. ${['Review employees','Taxes and deductions','Approve and submit'][n-1]}</span>`;
+  let b='';
+  if(runStep===1)b=`<div class="card"><h2>Review ${act.length} employees</h2>${rows.length?`<div class="tw"><table><thead><tr><th>Employee</th><th>Type</th><th style="text-align:right">Gross</th><th style="text-align:right">Net</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${person(r.e,r.e.dept)}</td><td>${r.e.cls.split(' ')[0]}</td><td class="num">${usd2(r.p.gross)}</td><td class="num">${usd2(r.p.net)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Add employees first.</div>'}</div>`;
+  if(runStep===2)b=`<div class="grid two"><div class="card"><h2>Employee withholdings</h2>${slip([['Federal income tax',T('fed')],['State income tax',T('state')],['Social Security (6.2%)',T('ss')],['Medicare (1.45%)',T('med')],['401(k) contributions',T('k401')],['Health benefits',T('health')]],'Total withheld',T('tax')+T('ben'))}</div>
+   <div class="card"><h2>Employer cost</h2>${slip([['Gross wages',T('gross')],['Employer Social Security (6.2%)',T('ss')],['Employer Medicare (1.45%)',T('med')],['Employer 401(k) match (3%)',T('gross')*.03]],'Total cost',T('gross')+T('ss')+T('med')+T('gross')*.03)}</div></div>`;
+  if(runStep===3)b=`<div class="card"><h2>Approve pay run</h2><dl class="dl"><dt>Pay period</dt><dd>${period(d)}</dd><dt>Pay date</dt><dd>${fmtD(d.pay)}</dd><dt>Employees</dt><dd>${act.length}</dd><dt>Net payout</dt><dd><b>${usd2(T('net'))}</b></dd></dl>
+   <label class="row" style="align-items:flex-start;gap:8px;margin:12px 0"><input type="checkbox" id="runok" ${runOk?'checked':''}> <span>I have reviewed hours, taxes and deductions and approve this payroll.</span></label><button class="btn primary" data-a="runpay" ${runOk?'':'disabled'} id="runbtn">Submit payroll</button></div>`;
+  return head('Run payroll',period(d)+' · pay date '+fmtD(d.pay),'<a class="btn" href="#payroll">Cancel</a>')+`<div class="steps">${stp(1)}${stp(2)}${stp(3)}</div>${b}<div class="row" style="margin-top:16px;justify-content:space-between">${runStep>1?'<button class="btn" data-a="runstep" data-id="-1">Back</button>':'<span></span>'}${runStep<3?'<button class="btn primary" data-a="runstep" data-id="1">Continue</button>':''}</div>`;
+};
+const MED={PPO:['Aetna PPO',85,'Low deductible, broad network'],HDHP:['Aetna HDHP with HSA',40,'High deductible, company HSA contribution'],Waive:['Waive medical',0,'I have other coverage']};
+VIEWS.benefits=function(){
+  const c=C(),m=me(),b=m.ben;
+  let h=head('Benefits','Open enrollment ends '+fmtD(c.openEnroll)+' · changes take effect Jan 1','');
+  h+=`<div class="card"><h2>My elections ${b.done?pill('Submitted','good'):pill('Not submitted','warn')}</h2><form id="bf" class="grid" style="gap:14px">
+   <fieldset style="border:1px solid var(--line);border-radius:10px;padding:12px"><legend class="lbl">Medical</legend>${Object.entries(MED).map(([k,v])=>`<label class="chk" style="cursor:pointer"><input type="radio" name="med" value="${k}" ${b.medical===k||(k==='Waive'&&!b.medical)?'checked':''}><div style="flex:1">${v[0]}<small class="hint" style="display:block">${v[2]}</small></div><span class="num">${usd2(v[1])}/pay</span></label>`).join('')}</fieldset>
+   <label class="chk" style="cursor:pointer"><input type="checkbox" id="bd" ${b.dental?'checked':''}><div style="flex:1">Dental<small class="hint" style="display:block">Delta Dental PPO</small></div><span class="num">$12.00/pay</span></label>
+   <label class="chk" style="cursor:pointer"><input type="checkbox" id="bv" ${b.vision?'checked':''}><div style="flex:1">Vision<small class="hint" style="display:block">VSP</small></div><span class="num">$5.00/pay</span></label>
+   <label class="field"><span>401(k) contribution: <b id="kv">${b.k401}%</b> of pay (company matches up to 3%)</span><input type="range" id="bk" min="0" max="20" value="${b.k401}"></label>
+   <div class="note" id="bsum"></div><div><button class="btn primary" type="submit">Submit elections</button></div></form></div>`;
+  if(role()==='admin'){const L=live().filter(e=>e.status==='Active');const n=L.filter(e=>e.ben.done).length;
+    h+=`<div class="card" style="margin-top:16px"><h2>Enrollment status <span class="row"><span class="hint">${n} of ${L.length} submitted</span><button class="btn sm" data-a="remind">Send reminder</button></span></h2><div class="bar" style="margin-bottom:10px"><i style="width:${L.length?n/L.length*100:0}%"></i></div><div class="tw"><table><thead><tr><th>Employee</th><th>Medical</th><th>Dental</th><th>Vision</th><th style="text-align:right">401(k)</th><th>Status</th></tr></thead><tbody>${L.map(e=>`<tr><td>${person(e,e.dept)}</td><td>${e.ben.medical||'Waived'}</td><td>${e.ben.dental?'Yes':'No'}</td><td>${e.ben.vision?'Yes':'No'}</td><td class="num">${e.ben.k401}%</td><td>${e.ben.done?pill('Submitted','good'):pill('Pending','warn')}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No employees yet.</td></tr>'}</tbody></table></div></div>`}
+  return h;
+};
+AFTER.benefits=function(){const f=$('#bf');const sum=()=>{const med=(f.med.value&&MED[f.med.value]?MED[f.med.value][1]:0),t=med+($('#bd').checked?12:0)+($('#bv').checked?5:0);$('#kv').textContent=$('#bk').value+'%';$('#bsum').textContent='Your cost: '+usd2(t)+' per paycheck before 401(k), about '+usd2(t*26/12)+' a month.'};f.addEventListener('input',sum);sum()};
+
+let revSel=null;
+VIEWS.performance=function(){
+  const c=C(),sc=team(),done=sc.filter(e=>c.reviews[e.id].status==='Completed');
+  const avg=done.length?(done.reduce((a,e)=>a+c.reviews[e.id].rating,0)/done.length).toFixed(1):'–';
+  return head('Performance','Mid-year review cycle · closes in 12 days','')+
+  `<div class="grid kpis" style="margin-bottom:16px"><div class="card kpi"><small>Completed</small><b>${done.length}/${sc.length}</b><span>reviews finished</span></div><div class="card kpi"><small>Average rating</small><b>${avg}</b><span>out of 5</span></div></div>
+  <div class="card"><div class="tw"><table><thead><tr><th>Employee</th><th>Goal progress</th><th>Stage</th><th style="text-align:right">Rating</th></tr></thead><tbody>${sc.map(e=>{const r=c.reviews[e.id],gp=Math.round(r.goals.reduce((a,g)=>a+g.p,0)/r.goals.length);return `<tr class="click" data-a="review" data-id="${e.id}"><td>${person(e)}</td><td style="min-width:140px"><div class="bar"><i style="width:${gp}%"></i></div><small class="hint">${gp}%</small></td><td>${pill(r.status,stKind(r.status))}</td><td class="num">${r.rating||'–'}</td></tr>`}).join('')}</tbody></table></div></div>`;
+};
+VIEWS.reports=function(){
+  const c=C(),sc=team(),months=[];
+  for(let i=5;i>=0;i--){const d=new Date(today.getFullYear(),today.getMonth()-i,1);months.push([d.toLocaleDateString('en-US',{month:'short'}),sc.filter(e=>{const j=new Date(e.join+'T00:00:00');return j.getMonth()===d.getMonth()&&j.getFullYear()===d.getFullYear()}).length])}
+  const ten=sc.length?(sc.reduce((a,e)=>a+(today-new Date(e.join+'T00:00:00')),0)/sc.length/864e5/365).toFixed(1):'0.0';
+  const lt=Object.keys(QUOTA).map(t=>[t,c.leaves.filter(l=>l.type===t&&l.status!=='Rejected'&&sc.some(e=>e.id===l.eid)).reduce((a,l)=>a+l.days,0)]);
+  const ctc=sc.reduce((a,e)=>a+e.ctc,0);
+  return head('Reports',role()==='admin'?'Company-wide workforce analytics':'Your team',role()==='admin'?`<button class="btn" data-a="export" data-id="emps">Export employees (CSV)</button><button class="btn" data-a="export" data-id="leave">Export time off (CSV)</button><button class="btn" data-a="export" data-id="payroll">Export payroll register (CSV)</button>`:'')+
+  `<div class="grid kpis"><div class="card kpi"><small>Headcount</small><b>${sc.length}</b><span>active</span></div><div class="card kpi"><small>Avg tenure</small><b>${ten}y</b><span>years in company</span></div><div class="card kpi"><small>Annual salary cost</small><b>$${(ctc/1e6).toFixed(2)}M</b><span>base salaries</span></div><div class="card kpi"><small>Open reviews</small><b>${sc.filter(e=>c.reviews[e.id].status!=='Completed').length}</b><span>this cycle</span></div></div>
+  <div class="grid two" style="margin-top:16px"><div class="card"><h2>Headcount by department</h2>${hbars(DEPTS.map(d=>[d,sc.filter(e=>e.dept===d).length]).filter(x=>x[1]))}</div>
+  <div class="card"><h2>New joiners, last 6 months</h2>${vbars(months)}</div><div class="card"><h2>Leave days taken or booked</h2>${hbars(lt)}</div></div>`;
+};
+VIEWS.news=function(){
+  const c=C();
+  return head('Announcements','Company and team updates','')+
+  (role()==='admin'?`<div class="card" style="margin-bottom:16px"><h2>Post an update</h2><form id="af" class="form"><label class="field"><span>Title</span><input id="at" required></label><label class="field"><span>Tag</span><select id="atag"><option>Policy</option><option>People</option><option>Performance</option><option>Benefits</option><option>Event</option></select></label><label class="field" style="grid-column:1/-1"><span>Message</span><textarea id="ab" rows="2" required></textarea></label><div><button class="btn primary" type="submit">Publish to everyone</button></div></form></div>`:'')+
+  `<div class="card">${c.anns.length?c.anns.map(a=>`<div class="ann"><small>${esc(a.tag)} · ${esc(a.by)} · ${fmtD(a.d)}</small><h3>${esc(a.t)}</h3><p style="margin:4px 0 0">${esc(a.b)}</p></div>`).join(''):'<div class="empty">No announcements yet.</div>'}</div>`;
+};
+VIEWS.documents=function(){
+  const c=C(),m=me(),ack=c.ack[m.id]||[],L=live();
+  return head('Documents','Company policies and acknowledgements','')+`<div class="card"><div class="tw"><table><thead><tr><th>Document</th><th>Your status</th>${role()==='admin'?'<th style="text-align:right">Company</th>':''}<th></th></tr></thead><tbody>${DOCS.map(d=>{const n=L.filter(e=>(c.ack[e.id]||[]).includes(d.id)).length;return `<tr><td>${d.t}<small class="hint" style="display:block">${d.s}</small></td><td>${ack.includes(d.id)?pill('Acknowledged','good'):pill('Needs review','warn')}</td>${role()==='admin'?`<td class="num">${n} of ${L.length}</td>`:''}<td style="text-align:right">${ack.includes(d.id)?'':`<button class="btn sm primary" data-a="ack" data-id="${d.id}">Acknowledge</button>`}</td></tr>`}).join('')}</tbody></table></div></div>`;
+};
+let stab='Company';
+VIEWS['company-settings']=function(){
+  const c=C(),tabs=['Company','Users and roles','Audit log'];
+  let b='';
+  if(stab==='Company')b=`<div class="card"><h2>Company profile</h2><form id="cf" class="form"><label class="field"><span>Company name</span><input id="cn2" value="${esc(c.name)}" required></label><label class="field"><span>Headquarters state</span><select id="cst">${STATES.map(s=>`<option ${s===c.state?'selected':''}>${s}</option>`).join('')}</select></label><label class="field"><span>Email domain</span><input value="${esc(c.domain)}" disabled></label><label class="field"><span>Pay schedule</span><select id="cps"><option>Bi-weekly</option></select></label><div style="grid-column:1/-1"><button class="btn primary" type="submit">Save changes</button></div></form></div>
+   ${c.id==='demo'?`<div class="card" style="margin-top:16px"><h2>Demo data</h2><p class="hint">Restore the sample company to its original state. All sign-ups and changes are cleared.</p><button class="btn no" data-a="resetdemo">Reset all demo data</button></div>`:''}`;
+  if(stab==='Users and roles')b=`<div class="card"><h2>Users and roles</h2><div class="tw"><table><thead><tr><th>Person</th><th>Role</th><th>Login</th><th></th></tr></thead><tbody>${c.emps.filter(e=>e.status!=='Terminated').map(e=>{const u=DB.users.find(x=>x.eid===e.id&&x.cid===c.id);return `<tr><td>${person(e,e.email)}</td><td><select data-a-change="role" data-id="${e.id}" ${e.id===me().id?'disabled':''} style="width:auto"><option value="employee" ${e.role==='employee'?'selected':''}>Employee</option><option value="manager" ${e.role==='manager'?'selected':''}>Manager</option><option value="admin" ${e.role==='admin'?'selected':''}>HR Admin</option></select></td><td>${u?(u.active?pill('Active','good'):pill('Deactivated','bad')):pill(e.status==='Onboarding'?'Invite pending':'No login','warn')}</td><td style="text-align:right;white-space:nowrap">${u&&e.id!==me().id?`<button class="btn sm" data-a="toggleuser" data-id="${e.id}">${u.active?'Deactivate':'Reactivate'}</button>`:''}${!u?`<button class="btn sm" data-a="invite" data-id="${e.id}">Send invite</button>`:''}</td></tr>`}).join('')}</tbody></table></div></div>`;
+  if(stab==='Audit log')b=`<div class="card"><h2>Audit log <span class="hint">latest ${c.audit.length}</span></h2><div class="tw"><table><thead><tr><th>When</th><th>Who</th><th>Event</th></tr></thead><tbody>${c.audit.length?c.audit.slice(0,60).map(a=>`<tr><td style="white-space:nowrap" class="hint">${new Date(a.t).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</td><td>${esc(a.who)}</td><td>${esc(a.what)}</td></tr>`).join(''):'<tr><td colspan="3" class="empty">No events yet.</td></tr>'}</tbody></table></div></div>`;
+  return head('Company settings','Workspace, access and security','')+`<div class="tabs" role="tablist">${tabs.map(t=>`<button role="tab" aria-selected="${t===stab}" data-a="stab" data-id="${t}">${t}</button>`).join('')}</div>${b}`;
+};
+VIEWS.account=function(){
+  const m=me();
+  return head('Account and security',esc(m.email),'')+`<div class="grid two"><div class="card"><h2>Change password</h2><form id="f-pw" class="grid" style="gap:12px"><div id="pwerr"></div><label class="field"><span>Current password</span><input id="cp" type="password" autocomplete="current-password" required></label><label class="field"><span>New password</span><input id="pw" type="password" autocomplete="new-password" required></label><div class="meter"><i id="meter"></i></div><div class="hint" id="meterT">${PWMSG}</div><div><button class="btn primary" type="submit">Update password</button></div></form></div>
+  <div class="card"><h2>Session</h2><dl class="dl"><dt>Signed in as</dt><dd>${esc(m.name)}</dd><dt>Role</dt><dd>${{admin:'HR Admin',manager:'Manager',employee:'Employee'}[m.role]}</dd><dt>Workspace</dt><dd>${esc(C().name)}</dd></dl><button class="btn" data-a="logout">Log out</button></div></div>`;
+};
+AFTER.account=()=>{$('#pw').addEventListener('input',meterUpd)};
+
+/* ---------- Drawers & modals ---------- */
+function drawer(html){$('#layer').innerHTML=`<div class="scrim" data-a="close"><aside class="drawer" role="dialog" aria-modal="true">${html}</aside></div>`}
+function modal(html){$('#layer').innerHTML=`<div class="scrim mid" data-a="close"><div class="modal" role="dialog" aria-modal="true">${html}</div></div>`}
+function closeD(){$('#layer').innerHTML=''}
+const closeRow=t=>`<div class="row sp" style="margin-bottom:8px"><h2>${t}</h2><button class="btn sm" data-a="closeb">Close</button></div>`;
+function empForm(e){const c=C(),mgrs=live().filter(x=>x.role!=='employee'||c.emps.some(y=>y.mgr===x.id));
+  return `<form id="${e?'ef':'nf'}" class="form" style="grid-template-columns:1fr;margin-top:12px" data-id="${e?e.id:''}">
+  <label class="field"><span>Full name</span><input id="nn" required value="${e?esc(e.name):''}"></label><label class="field"><span>Job title</span><input id="nt" required value="${e?esc(e.title):''}"></label>
+  <label class="field"><span>Department</span><select id="nd">${DEPTS.map(d=>`<option ${e&&e.dept===d?'selected':''}>${d}</option>`).join('')}</select></label>
+  <label class="field"><span>Manager</span><select id="nm"><option value="">None</option>${live().filter(x=>!e||x.id!==e.id).map(x=>`<option value="${x.id}" ${e&&e.mgr===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label>
+  <label class="field"><span>Work location</span><select id="nl">${['New York, NY','Austin, TX','Chicago, IL','San Francisco, CA','Seattle, WA','Remote, FL'].map(l=>`<option ${e&&e.loc===l?'selected':''}>${l}</option>`).join('')}</select></label>
+  <label class="field"><span>Annual salary ($)</span><input id="nc" type="number" min="20000" required value="${e?e.ctc:85000}"></label>
+  ${e?'':`<label class="field"><span>Start date</span><input id="ns" type="date" required value="${shift(7)}"></label><label class="field"><span>Work email (login)</span><input id="ne" type="email" placeholder="Auto-generated if blank"></label>`}
+  <div id="ferr"></div><button class="btn primary" type="submit">${e?'Save changes':'Create employee and send invite'}</button></form>`}
+function empDrawer(id){drawer(closeRow('Edit employee')+empForm(byId(id)))}
+function addEmpDrawer(){drawer(closeRow('Add employee')+'<p class="hint" style="margin:0">They receive an invite, then complete W-4, I-9 and direct deposit in their onboarding checklist.</p>'+empForm(null))}
+const FORMS={
+ w4:{t:'Federal Form W-4',f:`<label class="field"><span>Filing status</span><select id="x1"><option>Single or Married filing separately</option><option>Married filing jointly</option><option>Head of household</option></select></label><label class="field"><span>Extra withholding per paycheck ($)</span><input id="x2" type="number" min="0" value="0"></label>`},
+ i9:{t:'Form I-9, Section 1',f:`<label class="field"><span>Citizenship or immigration status</span><select id="x1"><option>A citizen of the United States</option><option>A noncitizen national</option><option>A lawful permanent resident</option><option>A noncitizen authorized to work</option></select></label><label class="field"><span>Type your full legal name to sign</span><input id="x2" required></label>`},
+ dd:{t:'Direct deposit',f:`<label class="field"><span>Bank name</span><input id="x1" required></label><label class="field"><span>Routing number (9 digits)</span><input id="x2" inputmode="numeric" maxlength="9" required></label><label class="field"><span>Account number</span><input id="x3" inputmode="numeric" maxlength="17" required></label>`},
+ hb:{t:'Employee handbook',f:`<p>I have read and agree to follow the Employee handbook (version 4.2).</p><label class="row" style="gap:8px"><input type="checkbox" id="x1" required> I acknowledge</label>`}};
+function taskModal(eid,tid){modal(closeRow(FORMS[tid].t)+`<form id="tf" class="grid" style="gap:12px" data-eid="${eid}" data-t="${tid}">${FORMS[tid].f}<div id="ferr"></div><button class="btn primary" type="submit">Submit</button></form>`)}
+function revDrawer(id){const c=C(),e=byId(id),r=c.reviews[id],self=id===me().id,rater=role()==='admin'||(role()==='manager'&&!self&&e.mgr===me().id);
+  drawer(`<div class="row sp">${pill(r.status,stKind(r.status))}<button class="btn sm" data-a="closeb">Close</button></div><h2 style="margin-top:8px">${esc(e.name)}</h2><div class="hint">${esc(e.title)}</div>
+  <h3 style="margin:18px 0 8px">Goals</h3>${r.goals.map((g,i)=>`<div style="margin-bottom:12px"><div class="row sp"><label for="g${i}">${esc(g.t)}</label><span class="num" id="gv${i}">${g.p}%</span></div><input id="g${i}" type="range" min="0" max="100" value="${g.p}" ${self||rater?'':'disabled'}></div>`).join('')}
+  ${rater?`<h3 style="margin:18px 0 8px">Manager assessment</h3><div class="form" style="grid-template-columns:1fr"><label class="field"><span>Rating</span><select id="rr"><option value="0">Not rated</option>${[1,2,3,4,5].map(n=>`<option value="${n}" ${r.rating===n?'selected':''}>${n} · ${['','Needs improvement','Below expectations','Meets expectations','Exceeds expectations','Outstanding'][n]}</option>`).join('')}</select></label><label class="field"><span>Feedback</span><textarea id="rf" rows="4">${esc(r.feedback)}</textarea></label></div>`:`<div class="note" style="margin-top:16px">${r.feedback?esc(r.feedback):'Your manager will add feedback once the review is complete.'} ${r.rating?'Rating: '+r.rating+'/5':''}</div>`}
+  <div class="row" style="margin-top:18px">${self||rater?`<button class="btn primary" data-a="saverev" data-id="${id}">Save progress</button>`:''}${rater?`<button class="btn" data-a="finrev" data-id="${id}">Mark completed</button>`:''}</div>`)}
+function payslipModal(rid){const c=C(),m=me(),r=c.runs.find(x=>x.id===rid),p=pay(m);
+  modal(closeRow('Payslip')+`<p class="hint" style="margin:0 0 10px">${esc(m.name)} · ${period(r)} · paid ${fmtD(r.pay)}</p><h3 style="margin:8px 0">Earnings</h3>${slip([['Regular pay',p.gross]],'Gross pay',p.gross)}<h3 style="margin:14px 0 8px">Deductions</h3>${slip([['Federal income tax',p.fed],['State income tax',p.state],['Social Security (6.2%)',p.ss],['Medicare (1.45%)',p.med],['401(k) contribution ('+m.ben.k401+'%)',p.k401],['Medical, dental, vision',p.health]],'Total deductions',p.tax+p.ben)}<div class="note" style="margin-top:14px">Net pay <b style="float:right;font-family:var(--f-mono)">${usd2(p.net)}</b><div style="color:var(--muted);margin-top:4px">Employer 401(k) match this period: ${usd2(p.gross*.03)}</div></div>`)}
+function palette(){
+  modal(`<input id="pq" placeholder="Search people or pages" autocomplete="off" style="margin-bottom:10px"><div id="pr"></div>`);$('#pq').focus();palFill('');
+}
+function palFill(q){q=q.toLowerCase();
+  const pages=NAV.flatMap(g=>g[1]).filter(i=>allowed(i[2])).concat([['account','Account and security','all']]).filter(i=>i[1].toLowerCase().includes(q));
+  const ppl=C().emps.filter(e=>e.status!=='Terminated'&&(e.name+' '+e.title+' '+e.dept).toLowerCase().includes(q)).slice(0,6);
+  $('#pr').innerHTML=(pages.length?`<div class="lbl" style="padding:6px 10px">Pages</div>${pages.map(p=>`<a class="mi" href="#${p[0]}" data-a="closeb">${p[1]}</a>`).join('')}`:'')+(ppl.length?`<div class="lbl" style="padding:6px 10px">People</div>${ppl.map(e=>`<a class="mi" href="#person-${e.id}" data-a="closeb">${esc(e.name)}<small>${esc(e.title)} · ${e.dept}</small></a>`).join('')}`:'')||'<div class="empty">No matches.</div>';
+}
+
+/* ---------- Actions ---------- */
+function setLeave(id,s){const c=C(),l=c.leaves.find(x=>x.id==id);if(!l)return;l.status=s;
+  log('Leave '+s.toLowerCase()+' for '+byId(l.eid).name);toast('Leave '+s.toLowerCase()+' for '+byId(l.eid).name.split(' ')[0]);commit()}
+function csv(rows){return rows.map(r=>r.map(v=>{v=String(v==null?'':v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(',')).join('\n')}
+async function exportCsv(kind){const c=C();let rows,name;
+  if(kind==='emps'){name='employees.csv';rows=[['Name','Email','Department','Title','Manager','Location','Start date','Status','Annual salary']].concat(c.emps.map(e=>[e.name,e.email,e.dept,e.title,(byId(e.mgr)||{}).name||'',e.loc,e.join,e.status,e.ctc]))}
+  if(kind==='leave'){name='time-off.csv';rows=[['Employee','Type','From','To','Days','Status','Reason']].concat(c.leaves.map(l=>[byId(l.eid).name,l.type,l.from,l.to,l.days,l.status,l.reason]))}
+  if(kind==='payroll'){name='payroll-register.csv';rows=[['Employee','Gross','Federal tax','State tax','Social Security','Medicare','401(k)','Benefits','Net']].concat(live().map(e=>{const p=pay(e);return [e.name,p.gross,p.fed,p.state,p.ss,p.med,p.k401,p.health,p.net].map((v,i)=>i?v.toFixed(2):v)}))}
+  log('Exported '+name);
+  try{const d=await claude.use('downloads');if(!d)throw 0;await d.save({filename:name,data:csv(rows)});toast('Export ready')}catch(e){if(e&&e.code==='declined')return;toast('Downloads are not available in this view.')}}
+
+document.addEventListener('click',async ev=>{
+  const el=ev.target.closest('[data-a]');
+  if(!ev.target.closest('.pop'))document.querySelectorAll('.panel').forEach(p=>p.hidden=true);
+  if(!el)return;const a=el.dataset.a,id=el.dataset.id;
+  if(a==='close'){if(ev.target===el)closeD();return}
+  if(a==='closeb')return closeD();
+  if(a==='auth'){AUTH.pending=AUTH.pending;return authGo(el.dataset.v)}
+  if(a==='showpw'){const i=$('#'+id);i.type=i.type==='password'?'text':'password';el.textContent=i.type==='password'?'Show':'Hide';return}
+  if(a==='demo')return login(el.dataset.em,DEMO_PW,false);
+  if(a==='resetdemo'){stDel(LS);stDel(SSK,localStorage);stDel(SSK,sessionStorage);SESS=null;DB={users:[],companies:{}};await seedDemo();AUTH={view:'login',err:'',msg:'Demo data reset.'};route='home';return renderAuth()}
+  if(a==='logout')return logout();
+  if(a==='menu'){ev.stopPropagation();const p=$('#p-'+id),was=p.hidden;document.querySelectorAll('.panel').forEach(x=>x.hidden=true);p.hidden=!was;return}
+  if(a==='navtoggle')return $('#rail').classList.toggle('open');
+  if(a==='palette')return palette();
+  if(a==='go'){location.hash=el.dataset.to;return}
+  if(a==='setup'){const c=C();
+    if(id==='import'){populateSample(c,'s',me().id);checkRun(c);log('Imported sample team');toast('Sample team imported');return commit()}
+    if(id==='addemp')return addEmpDrawer();
+    if(id==='paysched'){c.paySet=true;log('Confirmed bi-weekly pay schedule');toast('Pay schedule confirmed');return commit()}return}
+  if(a==='addemp')return addEmpDrawer();
+  if(a==='editemp')return empDrawer(id);
+  if(a==='offboard'){const e=byId(id);modal(closeRow('Offboard '+esc(e.name)+'?')+`<p>Their login is deactivated immediately and they move out of the active directory. This is recorded in the audit log.</p><div class="row"><button class="btn no" data-a="offok" data-id="${id}">Offboard employee</button><button class="btn" data-a="closeb">Cancel</button></div>`);return}
+  if(a==='offok'){const c=C(),e=byId(id);e.status='Terminated';DB.users.forEach(u=>{if(u.eid===id&&u.cid===c.id)u.active=false});c.emps.forEach(x=>{if(x.mgr===id)x.mgr=e.mgr});log('Offboarded '+e.name);closeD();toast(e.name+' offboarded');return commit()}
+  if(a==='ptab'){ptab=id;return render()}
+  if(a==='stab'){stab=id;return render()}
+  if(a==='task'){const t=el.dataset.t;if(FORMS[t]&&byId(id).id===me().id)return taskModal(id,t);return doTask(id,t)}
+  if(a==='review')return revDrawer(id);
+  if(a==='approve')return setLeave(id,'Approved');
+  if(a==='reject')return setLeave(id,'Rejected');
+  if(a==='cancel'){const c=C();c.leaves=c.leaves.filter(l=>l.id!=id);toast('Request withdrawn');return commit()}
+  if(a==='calnav'){if(id==='0')calM={y:today.getFullYear(),m:today.getMonth()};else{const d=new Date(calM.y,calM.m+ +id,1);calM={y:d.getFullYear(),m:d.getMonth()}}return render()}
+  if(a==='runstep'){runStep=Math.max(1,Math.min(3,runStep+ +id));return render()}
+  if(a==='runpay'){const c=C(),d=c.runs.find(r=>r.status==='Draft'),act=live().filter(e=>e.status==='Active'||e.status==='Onboarding'&&e.join<=d.end);
+    d.status='Processed';d.count=act.length;d.gross=act.reduce((x,e)=>x+pay(e).gross,0);d.net=act.reduce((x,e)=>x+pay(e).net,0);
+    c.runs.push({id:'rd'+Date.now(),start:shift(12),end:shift(25),pay:shift(31),status:'Draft'});c.paySet=true;log('Processed payroll for '+period(d));runStep=1;runOk=false;toast('Payroll submitted for '+act.length+' employees');location.hash='payroll';return commit()}
+  if(a==='payslip')return payslipModal(id);
+  if(a==='remind'){log('Sent benefits reminder');return toast('Reminder sent to pending employees')}
+  if(a==='ack'){const c=C();c.ack[me().id].push(id);log('Acknowledged '+DOCS.find(d=>d.id===id).t);toast('Acknowledged');return commit()}
+  if(a==='export')return exportCsv(id);
+  if(a==='toggleuser'){const u=DB.users.find(x=>x.eid===id&&x.cid===SESS.cid);u.active=!u.active;log((u.active?'Reactivated':'Deactivated')+' login for '+byId(id).name);return commit()}
+  if(a==='invite'){const e=byId(id);log('Sent invite to '+e.email);if(e.status==='Active'){e.status='Active'}return toast('Invite sent to '+e.email+'. In this prototype they can use "Set up your account" on the log in page.')}
+  if(a==='saverev'||a==='finrev'){const c=C(),r=c.reviews[id];r.goals.forEach((g,i)=>{const s=$('#g'+i);if(s)g.p=+s.value});
+    if($('#rr')){r.rating=+$('#rr').value;r.feedback=$('#rf').value}
+    if(a==='finrev'){if(!r.rating){toast('Add a rating before completing the review.');return}r.status='Completed'}
+    else if(r.status==='Not started')r.status=id===me().id?'Self review':'Manager review';
+    log((a==='finrev'?'Completed':'Updated')+' review for '+byId(id).name);toast(a==='finrev'?'Review completed':'Progress saved');closeD();return commit()}
+});
+function doTask(eid,tid,data){const c=C(),e=byId(eid),ts=c.onb[eid],t=ts.find(x=>x.id===tid);if(!t)return;t.done=true;
+  if(data){if(tid==='w4')e.forms.w4=data;if(tid==='i9')e.forms.i9=data;if(tid==='dd')e.forms.dd=data;if(tid==='hb'){c.ack[eid]=Array.from(new Set((c.ack[eid]||[]).concat('hb')))}}
+  log('Onboarding task done: '+t.t+' ('+e.name+')');
+  if(ts.every(x=>x.done)){e.status='Active';delete c.onb[eid];toast('Onboarding complete for '+e.name.split(' ')[0])}else toast('Task completed');
+  closeD();commit()}
+document.addEventListener('change',ev=>{
+  const t=ev.target;
+  if(t.dataset.aChange==='role'){const e=byId(t.dataset.id);e.role=t.value;log('Changed role of '+e.name+' to '+t.value);toast(e.name.split(' ')[0]+' is now '+({admin:'an HR Admin',manager:'a Manager',employee:'an Employee'}[t.value]));commit()}
+  if(t.id==='df'){dirD=t.value;fillEmps()}if(t.id==='sf'){dirS=t.value;fillEmps()}
+  if(t.id==='runok'){runOk=t.checked;$('#runbtn').disabled=!runOk}
+});
+document.addEventListener('input',ev=>{
+  const t=ev.target;
+  if(t.id==='q'){dirQ=t.value;fillEmps()}
+  if(t.id==='pq')palFill(t.value);
+  if(/^g\d$/.test(t.id))$('#gv'+t.id.slice(1)).textContent=t.value+'%';
+});
+document.addEventListener('submit',async ev=>{
+  const f=ev.target,id=f.id;ev.preventDefault();
+  const ferr=m=>{const x=f.querySelector('#ferr');if(x)x.innerHTML=`<div class="err" role="alert">${esc(m)}</div>`};
+  if(id==='f-login')return login($('#em').value,$('#pw').value,$('#rem').checked);
+  if(id==='f-signup'){
+    const name=$('#sn').value.trim(),email=$('#em').value.trim().toLowerCase(),pw=$('#pw').value,cn=$('#cn').value.trim();
+    if(name.split(' ').length<2||name.length<3)return authErr('Enter your first and last name.');
+    if(!validEmail(email))return authErr('Enter a valid work email address.');
+    if(/@(gmail|yahoo|hotmail|outlook|icloud)\./.test(email))return authErr('Use your company email address, not a personal one.');
+    if(!pwOk(pw))return authErr(PWMSG);if(cn.length<2)return authErr('Enter your company name.');
+    if(!$('#tos').checked)return authErr('Accept the Terms of Service to continue.');
+    if(DB.users.some(u=>u.email===email))return authErr('An account with this email already exists. Log in instead.');
+    AUTH.pending={name,email,pw,cn,size:$('#cs').value,state:$('#st').value,code:String(Math.floor(100000+Math.random()*900000))};AUTH.err='';AUTH.view='verify';return renderAuth()}
+  if(id==='f-verify'){const p=AUTH.pending;if($('#vc').value.trim()!==p.code)return authErr('That code is not right. Check it and try again.');
+    const c=newCompany(p.cn,p.state,p.size,p.email.split('@')[1]);
+    const e=addEmp(c,{name:p.name,dept:'HR',title:'HR Administrator',ctc:90000,role:'admin',email:p.email,loc:'New York, NY',ben:{medical:'PPO',dental:true,vision:false,k401:4,done:true}});
+    c.anns.push({id:1,t:'Welcome to '+p.cn+' on SmartHR',b:'Your workspace is live. Invite your team from the Directory.',by:p.name,d:TK,tag:'People'});
+    checkRun(c);audit(c,p.name,'Company account created');DB.companies[c.id]=c;DB.users.push(await mkUser(p.email,p.pw,c.id,e.id));save();
+    AUTH.pending=null;route='home';location.hash='home';await login(p.email,p.pw,true,true);return toast('Welcome to SmartHR. Your workspace is ready.')}
+  if(id==='f-join'){const email=$('#em').value.trim().toLowerCase(),pw=$('#pw').value;
+    if(!validEmail(email))return authErr('Enter a valid work email address.');if(!pwOk(pw))return authErr(PWMSG);
+    if(DB.users.some(u=>u.email===email))return authErr('This email already has an account. Log in instead.');
+    let hit=null;for(const c of Object.values(DB.companies)){const e=c.emps.find(x=>x.email===email&&x.status==='Onboarding');if(e)hit={c,e}}
+    if(!hit)return authErr('No pending invite found for that email. Ask your administrator to send one.');
+    DB.users.push(await mkUser(email,pw,hit.c.id,hit.e.id));audit(hit.c,hit.e.name,'Accepted invite and created account');save();return login(email,pw,false)}
+  if(id==='f-forgot'){const email=$('#em').value.trim().toLowerCase();if(!validEmail(email))return authErr('Enter a valid email address.');
+    const u=DB.users.find(x=>x.email===email);AUTH.pending={email,code:String(Math.floor(100000+Math.random()*900000)),ok:!!u};AUTH.err='';AUTH.view='reset';return renderAuth()}
+  if(id==='f-reset'){const p=AUTH.pending,pw=$('#pw').value;
+    if(!p.ok||$('#vc').value.trim()!==p.code)return authErr('That code is not valid. Request a new one.');if(!pwOk(pw))return authErr(PWMSG);
+    const u=DB.users.find(x=>x.email===p.email);u.salt=rand(8);u.hash=await hashPw(pw,u.salt);u.fail=0;u.lock=0;const c=DB.companies[u.cid];if(c)audit(c,p.email,'Password reset');save();AUTH.pending=null;return authGo('login','Password updated. Log in with your new password.')}
+  if(id==='f-pw'){const u=DB.users.find(x=>x.email===SESS.email),cur=$('#cp').value,pw=$('#pw').value,box=$('#pwerr');
+    const bad=m=>box.innerHTML=`<div class="err" role="alert">${m}</div>`;
+    if(await hashPw(cur,u.salt)!==u.hash)return bad('Your current password is incorrect.');if(!pwOk(pw))return bad(PWMSG);if(pw===cur)return bad('Choose a password you have not used here.');
+    u.salt=rand(8);u.hash=await hashPw(pw,u.salt);log('Changed password');save();f.reset();box.innerHTML='';return toast('Password updated')}
+  if(id==='lf'){const c=C(),a=$('#lfrom').value,b=$('#lto').value,d=wdays(a,b);
+    if(b<a||d<1)return toast('Pick working days with an end date after the start.');
+    const t=$('#lt').value;if(d>balance(me(),t))return toast('Not enough '+t+' leave. You have '+balance(me(),t)+' day(s).');
+    c.leaves.push({id:c.nextLeave++,eid:me().id,type:t,from:a,to:b,days:d,reason:$('#lr').value.trim(),status:'Pending'});log('Requested '+d+' day(s) of '+t);toast('Request sent to your manager');return commit()}
+  if(id==='af'){const c=C();c.anns.unshift({id:Date.now(),t:$('#at').value,b:$('#ab').value,by:me().name,d:TK,tag:$('#atag').value});log('Posted announcement');toast('Announcement published');return commit()}
+  if(id==='bf'){const m=me();m.ben={medical:f.med.value==='Waive'?null:f.med.value,dental:$('#bd').checked,vision:$('#bv').checked,k401:+$('#bk').value,done:true};log('Submitted benefits elections');toast('Benefits elections submitted');return commit()}
+  if(id==='cf'){const c=C();c.name=$('#cn2').value.trim()||c.name;c.state=$('#cst').value;log('Updated company profile');toast('Company profile saved');return commit()}
+  if(id==='nf'||id==='ef'){const c=C(),sal=+$('#nc').value;
+    if(sal<20000)return ferr('Enter an annual salary of at least $20,000.');if($('#nn').value.trim().split(' ').length<2)return ferr('Enter a first and last name.');
+    if(id==='ef'){const e=byId(f.dataset.id);Object.assign(e,{name:$('#nn').value.trim(),title:$('#nt').value.trim(),dept:$('#nd').value,mgr:$('#nm').value||null,loc:$('#nl').value,ctc:sal,cls:sal<60000?'Non-exempt (hourly)':'Exempt (salaried)'});log('Updated '+e.name);closeD();toast('Changes saved');return commit()}
+    const em=$('#ne').value.trim().toLowerCase();if(em&&!validEmail(em))return ferr('Enter a valid email or leave it blank.');
+    if(em&&(c.emps.some(x=>x.email===em)||DB.users.some(u=>u.email===em)))return ferr('That email is already in use.');
+    const e=addEmp(c,{name:$('#nn').value.trim(),title:$('#nt').value.trim(),dept:$('#nd').value,mgr:$('#nm').value||null,loc:$('#nl').value,ctc:sal,join:$('#ns').value,status:'Onboarding',email:em||undefined});
+    log('Added '+e.name+' and sent invite to '+e.email);closeD();toast('Invite sent to '+e.email);location.hash='onboarding';return commit()}
+  if(id==='tf'){const eid=f.dataset.eid,t=f.dataset.t,v=k=>{const x=f.querySelector('#'+k);return x?x.value.trim():''};
+    if(t==='dd'){if(!/^\d{9}$/.test(v('x2')))return ferr('A routing number has exactly 9 digits.');if(!/^\d{4,17}$/.test(v('x3')))return ferr('Enter the account number using digits only.')}
+    if(t==='i9'&&v('x2').length<3)return ferr('Type your full legal name to sign.');
+    const data=t==='w4'?{filing:v('x1').split(' ')[0],extra:v('x2')}:t==='i9'?{status:v('x1'),signed:v('x2')}:t==='dd'?{bank:v('x1'),last4:v('x3').slice(-4)}:{ok:true};
+    return doTask(eid,t,data)}
+});
+document.addEventListener('keydown',ev=>{
+  if(ev.key==='Escape')closeD();
+  if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='k'&&SESS){ev.preventDefault();palette()}
+});
+window.addEventListener('hashchange',()=>{if(!SESS)return;route=(location.hash||'#home').slice(1);closeD();render();window.scrollTo(0,0)});
+
+/* ---------- Boot ---------- */
+(async function boot(){
+  try{const raw=st(LS);if(raw)DB=JSON.parse(raw)}catch(e){}
+  if(!DB||!DB.users||!DB.companies||!DB.companies.demo){DB={users:[],companies:{}};await seedDemo()}
+  const raw=st(SSK,sessionStorage)||st(SSK);
+  if(raw){try{const s=JSON.parse(raw),u=DB.users.find(x=>x.email===s.email&&x.active),c=u&&DB.companies[u.cid],e=c&&c.emps.find(x=>x.id===u.eid);if(e&&e.status!=='Terminated')SESS={email:u.email,cid:u.cid,eid:u.eid}}catch(e){}}
+  route=(location.hash||'#home').slice(1)||'home';
+  if(SESS)render();else renderAuth();
+})();
+})();
+</script>
