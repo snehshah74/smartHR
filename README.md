@@ -4,6 +4,10 @@ Clickable prototype of an HR platform for US companies: sign up, log in, invites
 
 This is a single-file front-end prototype. All data is stored in the browser (local storage). Authentication is simulated and is not secure. Do not enter real personal data.
 
+## Latest feature
+
+**CSV employee import** (user story P-7). As an HR Admin, open Directory, then Import CSV. Download the template, upload a file or paste rows, review a preview with per-row errors (invalid email, duplicate email, unknown department, low salary, bad date, manager not found), and import only the rows that pass. Managers are linked by email, including managers in the same file. The import is written to the audit log.
+
 ## Run
 
 Open `index.html` in a browser, or serve the folder:

@@ -111,6 +111,7 @@ input[type=range]{padding:0}
 .scrim.mid{justify-content:center;align-items:flex-start;padding:8vh 16px 16px}
 .drawer{background:var(--surface);width:min(460px,100%);height:100%;overflow:auto;padding:22px max(20px,env(safe-area-inset-right,0px)) 40px 22px;border-left:1px solid var(--line)}
 .modal{background:var(--surface);width:min(520px,100%);max-height:84vh;overflow:auto;border-radius:14px;padding:22px;border:1px solid var(--line);height:fit-content}
+.modal.wide{width:min(900px,100%)}
 .drawer h2,.modal h2{font-size:22px;margin-bottom:4px}
 .dl{display:grid;grid-template-columns:130px 1fr;gap:8px 12px;margin:12px 0}.dl dt{color:var(--muted)}.dl dd{margin:0;min-width:0;overflow-wrap:anywhere}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:9px;z-index:80;max-width:90%}
@@ -469,7 +470,7 @@ VIEWS.home=function(){
 let dirQ='',dirD='',dirS='';
 VIEWS.people=function(){
   const c=C();
-  return head('Directory',live().length+' people at '+esc(c.name),role()==='admin'?`<button class="btn primary" data-a="addemp">Add employee</button>`:'')+
+  return head('Directory',live().length+' people at '+esc(c.name),role()==='admin'?`<button class="btn" data-a="import">Import CSV</button><button class="btn primary" data-a="addemp">Add employee</button>`:'')+
   `<div class="card"><div class="row" style="margin-bottom:12px"><input id="q" type="search" placeholder="Search name, title or email" value="${esc(dirQ)}" style="flex:1;min-width:200px;width:auto"><select id="df" aria-label="Department" style="width:auto"><option value="">All departments</option>${DEPTS.map(d=>`<option ${d===dirD?'selected':''}>${d}</option>`).join('')}</select>${role()==='admin'?`<select id="sf" aria-label="Status" style="width:auto"><option value="">Active and onboarding</option><option ${dirS==='Terminated'?'selected':''} value="Terminated">Terminated</option></select>`:''}</div>
   <div class="tw"><table><thead><tr><th>Employee</th><th>Department</th><th>Location</th><th>Start date</th><th>Status</th></tr></thead><tbody id="eb"></tbody></table></div></div>`;
 };
@@ -657,6 +658,83 @@ function revDrawer(id){const c=C(),e=byId(id),r=c.reviews[id],self=id===me().id,
   <div class="row" style="margin-top:18px">${self||rater?`<button class="btn primary" data-a="saverev" data-id="${id}">Save progress</button>`:''}${rater?`<button class="btn" data-a="finrev" data-id="${id}">Mark completed</button>`:''}</div>`)}
 function payslipModal(rid){const c=C(),m=me(),r=c.runs.find(x=>x.id===rid),p=pay(m);
   modal(closeRow('Payslip')+`<p class="hint" style="margin:0 0 10px">${esc(m.name)} · ${period(r)} · paid ${fmtD(r.pay)}</p><h3 style="margin:8px 0">Earnings</h3>${slip([['Regular pay',p.gross]],'Gross pay',p.gross)}<h3 style="margin:14px 0 8px">Deductions</h3>${slip([['Federal income tax',p.fed],['State income tax',p.state],['Social Security (6.2%)',p.ss],['Medicare (1.45%)',p.med],['401(k) contribution ('+m.ben.k401+'%)',p.k401],['Medical, dental, vision',p.health]],'Total deductions',p.tax+p.ben)}<div class="note" style="margin-top:14px">Net pay <b style="float:right;font-family:var(--f-mono)">${usd2(p.net)}</b><div style="color:var(--muted);margin-top:4px">Employer 401(k) match this period: ${usd2(p.gross*.03)}</div></div>`)}
+
+/* ---------- CSV import (story P-7) ---------- */
+const IMP_REQUIRED=['name','email','title','department','annual_salary','start_date'];
+let IMP=null;
+function impTemplate(){const d=C().domain;return 'name,email,title,department,manager_email,location,annual_salary,start_date\nAva Martinez,ava.martinez@'+d+',Account Executive,Sales,noah.bennett@'+d+',"Austin, TX",82000,2026-03-02\nBen Carter,ben.carter@'+d+',Software Engineer,Engineering,,"New York, NY",98000,2025-08-18\n'}
+function parseCsv(t){const rows=[];let r=[],f='',q=false;t=t.replace(/^﻿/,'');
+  for(let i=0;i<t.length;i++){const ch=t[i];
+    if(q){if(ch==='"'){if(t[i+1]==='"'){f+='"';i++}else q=false}else f+=ch}
+    else if(ch==='"')q=true;
+    else if(ch===','){r.push(f);f=''}
+    else if(ch==='\n'||ch==='\r'){if(ch==='\r'&&t[i+1]==='\n')i++;r.push(f);f='';if(r.some(x=>x.trim()!==''))rows.push(r);r=[]}
+    else f+=ch}
+  r.push(f);if(r.some(x=>x.trim()!==''))rows.push(r);return rows}
+function parseDate(s){s=s.trim();let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/),y,mo,d;
+  if(m){y=+m[1];mo=+m[2];d=+m[3]}else if((m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/))){mo=+m[1];d=+m[2];y=+m[3]}else return null;
+  const dt=new Date(y,mo-1,d);if(dt.getFullYear()!==y||dt.getMonth()!==mo-1||dt.getDate()!==d)return null;return dkey(dt)}
+function impValidate(text){
+  const c=C(),rows=parseCsv(text);
+  if(!rows.length)return {err:'The file is empty.'};
+  const head=rows[0].map(h=>h.trim().toLowerCase().replace(/\s+/g,'_'));
+  const missing=IMP_REQUIRED.filter(k=>!head.includes(k));
+  if(missing.length)return {err:'Missing column'+(missing.length>1?'s':'')+': '+missing.join(', ')+'. Use the template.'};
+  if(rows.length<2)return {err:'The file has a header row but no employees.'};
+  if(rows.length-1>500)return {err:'Import up to 500 rows at a time.'};
+  const idx=k=>head.indexOf(k);
+  const existing=new Set(c.emps.map(e=>e.email.toLowerCase()).concat(DB.users.map(u=>u.email)));
+  const seen=new Set(),out=[];
+  rows.slice(1).forEach((r,i)=>{
+    const g=k=>idx(k)<0?'':(r[idx(k)]||'').trim();
+    const o={n:i+2,name:g('name'),email:g('email').toLowerCase(),title:g('title'),dept:g('department'),mgr:g('manager_email').toLowerCase(),loc:g('location'),sal:g('annual_salary'),start:g('start_date'),errs:[]};
+    if(o.name.split(/\s+/).filter(Boolean).length<2)o.errs.push('Enter first and last name');
+    if(!validEmail(o.email))o.errs.push('Invalid email');
+    else if(existing.has(o.email))o.errs.push('Email already in use');
+    else if(seen.has(o.email))o.errs.push('Duplicate email in file');
+    seen.add(o.email);
+    if(!o.title)o.errs.push('Title is missing');
+    const dep=DEPTS.find(d=>d.toLowerCase()===o.dept.toLowerCase());
+    if(!dep)o.errs.push('Unknown department');else o.dept=dep;
+    o.salN=parseFloat(o.sal.replace(/[$,\s]/g,''));
+    if(!(o.salN>=20000))o.errs.push('Salary must be at least $20,000');
+    o.startD=parseDate(o.start);
+    if(!o.startD)o.errs.push('Start date must be YYYY-MM-DD or M/D/YYYY');
+    if(o.loc){const m=o.loc.match(/^(.+),\s*([A-Za-z]{2})$/);if(!m||!STATES.includes(m[2].toUpperCase()))o.errs.push('Location must look like Austin, TX');else o.loc=m[1].trim()+', '+m[2].toUpperCase()}
+    out.push(o)});
+  const okEmails=new Set(out.filter(o=>!o.errs.length).map(o=>o.email));
+  out.forEach(o=>{if(o.mgr){
+    if(o.mgr===o.email)o.errs.push('Cannot report to themselves');
+    else if(!c.emps.some(e=>e.email.toLowerCase()===o.mgr)&&!okEmails.has(o.mgr))o.errs.push('Manager not found');}});
+  return {rows:out}}
+function modalWide(html){modal(html);const m=document.querySelector('#layer .modal');if(m)m.classList.add('wide')}
+function impModal(msg){
+  modalWide(closeRow('Import employees from CSV')+`<p class="hint" style="margin:0 0 10px">Upload a file or paste rows. Required columns: name, email, title, department, annual_salary, start_date. Optional: manager_email, location. Up to 500 rows. Imported people are added as Active; invite them from Company settings when they should log in.</p>
+  <div class="row"><button class="btn sm" data-a="csvtemplate">Download template</button><input type="file" id="impfile" accept=".csv,text/csv" aria-label="CSV file" style="width:auto"></div>
+  <label class="field" style="margin-top:12px"><span>Or paste CSV text</span><textarea id="imptext" rows="8" placeholder="name,email,title,department,manager_email,location,annual_salary,start_date"></textarea></label>
+  <div id="ferr">${msg?`<div class="err" role="alert">${esc(msg)}</div>`:''}</div>
+  <div class="row" style="margin-top:12px"><button class="btn primary" data-a="imppreview">Preview import</button></div>`)}
+function impPreview(){
+  const t=($('#imptext')||{}).value||'';
+  if(!t.trim())return impShowErr('Choose a file or paste CSV text first.');
+  const res=impValidate(t);if(res.err)return impShowErr(res.err);
+  IMP=res;const ok=res.rows.filter(o=>!o.errs.length).length,bad=res.rows.length-ok,shown=res.rows.slice(0,100);
+  modalWide(closeRow('Preview import')+`<div class="row" style="margin-bottom:10px">${pill(ok+' ready','good')}${bad?pill(bad+' with problems','bad'):''}<span class="hint">Only rows without problems are imported.${res.rows.length>100?' Showing the first 100 rows.':''}</span></div>
+  <div class="tw"><table><thead><tr><th>Row</th><th>Name</th><th>Email</th><th>Department</th><th style="text-align:right">Salary</th><th>Start</th><th>Result</th></tr></thead><tbody>${shown.map(o=>`<tr><td class="num">${o.n}</td><td>${esc(o.name)}</td><td>${esc(o.email)}</td><td>${esc(o.dept)}</td><td class="num">${o.salN>=0?inr(o.salN):esc(o.sal)}</td><td>${o.startD?fmtD(o.startD):esc(o.start)}</td><td>${o.errs.length?o.errs.map(e=>pill(e,'bad')).join(' '):pill('Ready','good')}</td></tr>`).join('')}</tbody></table></div>
+  <div class="row" style="margin-top:14px"><button class="btn primary" data-a="impgo" ${ok?'':'disabled'}>Import ${ok} employee${ok===1?'':'s'}</button><button class="btn" data-a="import">Back</button></div>`)}
+function impShowErr(m){const x=document.querySelector('#ferr');if(x)x.innerHTML=`<div class="err" role="alert">${esc(m)}</div>`}
+function impRun(){
+  if(!IMP)return;const c=C(),ok=IMP.rows.filter(o=>!o.errs.length);
+  const made=ok.map(o=>addEmp(c,{name:o.name,email:o.email,title:o.title,dept:o.dept,ctc:o.salN,join:o.startD,loc:o.loc||'New York, NY',status:'Active'}));
+  made.forEach((e,i)=>{const m=ok[i].mgr;if(m){const mm=c.emps.find(x=>x.email.toLowerCase()===m);e.mgr=mm&&mm.id!==e.id?mm.id:null}});
+  const skipped=IMP.rows.length-made.length;
+  log('Imported '+made.length+' employees from CSV'+(skipped?' ('+skipped+' rows skipped)':''));
+  toast(made.length+' employee'+(made.length===1?'':'s')+' imported'+(skipped?', '+skipped+' skipped':''));
+  IMP=null;closeD();commit()}
+async function saveText(name,text){
+  try{const d=await claude.use('downloads');if(!d)throw 0;await d.save({filename:name,data:text});toast('File ready')}
+  catch(e){if(e&&e.code==='declined')return;try{const u=URL.createObjectURL(new Blob([text],{type:'text/csv'}));const l=document.createElement('a');l.href=u;l.download=name;document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);toast('File ready')}catch(x){toast('Download failed.')}}}
+
 function palette(){
   modal(`<input id="pq" placeholder="Search people or pages" autocomplete="off" style="margin-bottom:10px"><div id="pr"></div>`);$('#pq').focus();palFill('');
 }
@@ -696,6 +774,10 @@ document.addEventListener('click',async ev=>{
     if(id==='import'){populateSample(c,'s',me().id);checkRun(c);log('Imported sample team');toast('Sample team imported');return commit()}
     if(id==='addemp')return addEmpDrawer();
     if(id==='paysched'){c.paySet=true;log('Confirmed bi-weekly pay schedule');toast('Pay schedule confirmed');return commit()}return}
+  if(a==='import')return impModal();
+  if(a==='imppreview')return impPreview();
+  if(a==='impgo')return impRun();
+  if(a==='csvtemplate')return saveText('smarthr-employee-template.csv',impTemplate());
   if(a==='addemp')return addEmpDrawer();
   if(a==='editemp')return empDrawer(id);
   if(a==='offboard'){const e=byId(id);modal(closeRow('Offboard '+esc(e.name)+'?')+`<p>Their login is deactivated immediately and they move out of the active directory. This is recorded in the audit log.</p><div class="row"><button class="btn no" data-a="offok" data-id="${id}">Offboard employee</button><button class="btn" data-a="closeb">Cancel</button></div>`);return}
@@ -731,6 +813,7 @@ function doTask(eid,tid,data){const c=C(),e=byId(eid),ts=c.onb[eid],t=ts.find(x=
   closeD();commit()}
 document.addEventListener('change',ev=>{
   const t=ev.target;
+  if(t.id==='impfile'&&t.files&&t.files[0]){const f=t.files[0];if(f.size>1048576)return impShowErr('That file is larger than 1 MB. Split it and import in parts.');const rd=new FileReader();rd.onload=()=>{const ta=$('#imptext');if(ta){ta.value=String(rd.result);const x=document.querySelector('#ferr');if(x)x.innerHTML=''}};rd.onerror=()=>impShowErr('Could not read that file.');rd.readAsText(f)}
   if(t.dataset.aChange==='role'){const e=byId(t.dataset.id);e.role=t.value;log('Changed role of '+e.name+' to '+t.value);toast(e.name.split(' ')[0]+' is now '+({admin:'an HR Admin',manager:'a Manager',employee:'an Employee'}[t.value]));commit()}
   if(t.id==='df'){dirD=t.value;fillEmps()}if(t.id==='sf'){dirS=t.value;fillEmps()}
   if(t.id==='runok'){runOk=t.checked;$('#runbtn').disabled=!runOk}
